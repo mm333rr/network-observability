@@ -7,7 +7,7 @@
 set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE="docker compose -f $STACK_DIR/docker-compose.yml"
+COMPOSE=(docker compose -f "$STACK_DIR/docker-compose.yml")
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -21,7 +21,7 @@ err() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 case "${1:-help}" in
   start)
     log "Starting NetworkObservability stack..."
-    $COMPOSE up -d
+    "${COMPOSE[@]}" up -d
     log "Stack started. Services:"
     echo "  Grafana:        http://localhost:3000  (admin / changeme_on_first_login)"
     echo "  Prometheus:     http://localhost:9090"
@@ -32,36 +32,36 @@ case "${1:-help}" in
     ;;
   stop)
     log "Stopping stack..."
-    $COMPOSE down
+    "${COMPOSE[@]}" down
     log "Stack stopped. Data volumes preserved."
     ;;
   restart)
     log "Restarting stack..."
-    $COMPOSE down
-    $COMPOSE up -d
+    "${COMPOSE[@]}" down
+    "${COMPOSE[@]}" up -d
     log "Stack restarted."
     ;;
   status)
-    $COMPOSE ps
+    "${COMPOSE[@]}" ps
     ;;
   logs)
     SERVICE="${2:-}"
     if [[ -n "$SERVICE" ]]; then
-      $COMPOSE logs -f --tail=100 "$SERVICE"
+      "${COMPOSE[@]}" logs -f --tail=100 "$SERVICE"
     else
-      $COMPOSE logs -f --tail=50
+      "${COMPOSE[@]}" logs -f --tail=50
     fi
     ;;
   pull)
     log "Pulling latest images..."
-    $COMPOSE pull
+    "${COMPOSE[@]}" pull
     warn "Run './manage.sh restart' to apply updated images."
     ;;
   clean)
     warn "This will remove ALL containers and volumes (DATA WILL BE DELETED). Continue? [y/N]"
     read -r confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-      $COMPOSE down -v
+      "${COMPOSE[@]}" down -v
       log "Stack and volumes removed."
     else
       log "Aborted."

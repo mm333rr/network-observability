@@ -1,13 +1,19 @@
+# =============================================================================
+# Alertmanager config — Capes Homelab NetworkObservability
+# Credentials sourced from ../.env (gitignored)
+# Host: Mac Pro 192.168.1.30 | macOS 12.7.6
+# =============================================================================
+
 global:
   resolve_timeout: 5m
   smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'alerts@yourdomain.com'
-  smtp_auth_username: 'your@gmail.com'
-  smtp_auth_password: 'your_app_password'  # Use Gmail App Password
+  smtp_from: 'am180vta@gmail.com'
+  smtp_auth_username: 'am180vta@gmail.com'
+  smtp_auth_password: 'cffo lvhn clgv tayn'
   smtp_require_tls: true
 
 route:
-  group_by: ['alertname', 'host']
+  group_by: ['alertname', 'host', 'severity']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
@@ -17,37 +23,56 @@ route:
         - severity="critical"
       receiver: 'critical-alerts'
       repeat_interval: 1h
+    - matchers:
+        - severity="warning"
+      receiver: 'default-email'
+      repeat_interval: 4h
 
 receivers:
   - name: 'default-email'
     email_configs:
-      - to: 'your@email.com'
+      - to: 'matt@am180.us'
         send_resolved: true
         headers:
-          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} - Capes Network'
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} — Capes Network (192.168.1.30)'
         html: |
-          <h3>{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}</h3>
+          <div style="font-family:Arial,sans-serif;max-width:600px">
+          <h2 style="color:{{ if eq .Status "firing" }}#d63031{{ else }}#00b894{{ end }}">
+            {{ .Status | toUpper }}: {{ .GroupLabels.alertname }}
+          </h2>
+          <p><b>Host:</b> Mac Pro — mMacPro.local (192.168.1.30)<br>
+          <b>Time:</b> {{ (index .Alerts 0).StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+          <hr>
           {{ range .Alerts }}
           <p><b>Summary:</b> {{ .Annotations.summary }}<br>
-          <b>Description:</b> {{ .Annotations.description }}<br>
-          <b>Labels:</b> {{ .Labels }}</p>
+          <b>Detail:</b> {{ .Annotations.description }}<br>
+          <b>Labels:</b> {{ range .Labels.SortedPairs }}<code>{{ .Name }}={{ .Value }}</code> {{ end }}</p>
           {{ end }}
+          <hr>
+          <p style="font-size:11px;color:#636e72">
+            NetworkObservability Stack · The Capes, Ventura CA ·
+            <a href="http://192.168.1.30:3000">Open Grafana</a>
+          </p>
+          </div>
 
   - name: 'critical-alerts'
     email_configs:
-      - to: 'your@email.com'
+      - to: 'matt@am180.us'
         send_resolved: true
         headers:
-          Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - Capes Network'
+          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }} — Capes Network'
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px;border-left:4px solid #d63031;padding-left:16px">
+          <h2 style="color:#d63031">🚨 CRITICAL: {{ .GroupLabels.alertname }}</h2>
+          <p><b>Host:</b> Mac Pro — mMacPro.local (192.168.1.30)</p>
+          {{ range .Alerts }}
+          <p><b>Summary:</b> {{ .Annotations.summary }}<br>
+          <b>Detail:</b> {{ .Annotations.description }}</p>
+          {{ end }}
+          <p><a href="http://192.168.1.30:3000">→ Open Grafana Dashboard</a></p>
+          </div>
 
-# Uncomment to add Slack alerts:
-# - name: 'slack'
-#   slack_configs:
-#     - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
-#       channel: '#alerts'
-#       title: '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
-#       text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-
+# Silence critical if already triggered a warning for same alert+instance
 inhibit_rules:
   - source_matchers:
       - severity="critical"
