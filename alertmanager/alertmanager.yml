@@ -9,7 +9,7 @@ global:
   smtp_smarthost: 'smtp.gmail.com:587'
   smtp_from: 'am180vta@gmail.com'
   smtp_auth_username: 'am180vta@gmail.com'
-  smtp_auth_password: 'cffo lvhn clgv tayn'
+  smtp_auth_password: 'cvsb wnei uifb wrjc'
   smtp_require_tls: true
 
 route:

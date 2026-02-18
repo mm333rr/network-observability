@@ -1,0 +1,149 @@
+{
+  "title": "Capes Homelab — Overview",
+  "uid": "capes-home",
+  "tags": ["home", "capes"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "text",
+      "title": "🏠 The Capes — Network Observability",
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "mode": "markdown",
+        "content": "# 🏠 The Capes Homelab — Mac Pro · 192.168.1.30\n\n**Stack:** Prometheus · Grafana · Loki · Promtail · Telegraf · Alertmanager · Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| 🖥️ Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| 📋 Log Browser | [Loki Logs](/d/liz0yRCZz/logs) |\n| 📡 Telegraf System | [Telegraf System](/d/000000074/telegraf-system-dashboard) |\n| 🌐 Network / SNMP | [SNMP Stats](/d/000000050/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) · [Alertmanager](http://localhost:9093) · [Promtail](http://localhost:9080)"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Mac Pro Uptime",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 4},
+      "id": 2,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
+      "targets": [{"expr": "node_time_seconds{job=\"node-exporter-macpro\"} - node_boot_time_seconds{job=\"node-exporter-macpro\"}", "legendFormat": "Uptime", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "CPU Usage %",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 4},
+      "id": 3,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)", "legendFormat": "CPU %", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "RAM Used %",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 4},
+      "id": 4,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "(node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}) / node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} * 100", "legendFormat": "RAM %", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "4TB-R1 Free",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 4},
+      "id": 5,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 107374182400}, {"color": "green", "value": 536870912000}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
+      "targets": [{"expr": "node_filesystem_avail_bytes{mountpoint=~\"/Volumes/4tb.*\",job=\"node-exporter-macpro\"}", "legendFormat": "4TB Free", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Active Alerts",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 4},
+      "id": 6,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
+      "targets": [{"expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)", "legendFormat": "Firing", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Stack Health",
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 4},
+      "id": 7,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 4}, {"color": "green", "value": 5}]},
+          "color": {"mode": "thresholds"},
+          "mappings": [{"type": "value", "options": {"5": {"text": "ALL UP ✅"}, "4": {"text": "4/5 ⚠️"}, "3": {"text": "3/5 ❌"}}}]
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
+      "targets": [{"expr": "count(up == 1)", "legendFormat": "Services Up", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage — Mac Pro (8-core Xeon E5 · 3GHz)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 8,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100, "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {"tooltip": {"mode": "multi"}, "legend": {"displayMode": "list", "placement": "bottom"}},
+      "targets": [{"expr": "100 - (avg by(cpu)(rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)", "legendFormat": "CPU {{cpu}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "RAM Usage — 64 GB",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 9,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"unit": "bytes", "color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "options": {"tooltip": {"mode": "multi"}, "legend": {"displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {"expr": "node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}", "legendFormat": "Used", "refId": "A"},
+        {"expr": "node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}", "legendFormat": "Available", "refId": "B"}
+      ]
+    }
+  ]
+}

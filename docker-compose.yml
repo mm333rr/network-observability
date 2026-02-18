@@ -7,6 +7,9 @@
 
 version: "3.8"
 
+# Load credentials from .env (gitignored — copy this file on Pi migration)
+# Edit .env with your real SMTP credentials before first launch
+
 networks:
   observability:
     driver: bridge
@@ -58,11 +61,15 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=changeme_on_first_login
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASS:-changeme_on_first_login}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_SERVER_DOMAIN=192.168.1.30
+      - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      # Dashboard provisioning from our dashboards folder
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/home.json
     depends_on:
       - prometheus
       - loki
@@ -168,10 +175,6 @@ services:
       - "9273:9273"   # Prometheus metrics exposition endpoint
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-    environment:
-      - HOST_PROC=/host/proc
-      - HOST_SYS=/host/sys
-      - HOST_ETC=/host/etc
     labels:
       - "stack=observability"
 
@@ -189,6 +192,11 @@ services:
     volumes:
       - alertmanager_data:/alertmanager
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    environment:
+      - SMTP_FROM=${SMTP_FROM:-alerts@example.com}
+      - SMTP_USER=${SMTP_USER:-alerts@example.com}
+      - SMTP_PASS=${SMTP_PASS:-changeme}
+      - ALERT_TO=${ALERT_TO:-admin@example.com}
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
