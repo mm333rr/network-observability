@@ -1,0 +1,56 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@yourdomain.com'
+  smtp_auth_username: 'your@gmail.com'
+  smtp_auth_password: 'your_app_password'  # Use Gmail App Password
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'host']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-email'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'critical-alerts'
+      repeat_interval: 1h
+
+receivers:
+  - name: 'default-email'
+    email_configs:
+      - to: 'your@email.com'
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} - Capes Network'
+        html: |
+          <h3>{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}</h3>
+          {{ range .Alerts }}
+          <p><b>Summary:</b> {{ .Annotations.summary }}<br>
+          <b>Description:</b> {{ .Annotations.description }}<br>
+          <b>Labels:</b> {{ .Labels }}</p>
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'your@email.com'
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - Capes Network'
+
+# Uncomment to add Slack alerts:
+# - name: 'slack'
+#   slack_configs:
+#     - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+#       channel: '#alerts'
+#       title: '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
+#       text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ['alertname', 'instance']

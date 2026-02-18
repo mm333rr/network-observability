@@ -1,0 +1,196 @@
+# =============================================================================
+# Network Observability Stack — Hybrid PLG + Prometheus + Telegraf
+# Host: MacPro / 4tb-R1  |  Migrateable to Pi
+# Server target: 192.168.1.35
+# Last updated: 2026-02-18
+# =============================================================================
+
+version: "3.8"
+
+networks:
+  observability:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/prometheus
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/grafana
+  loki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/loki
+  alertmanager_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/alertmanager
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # GRAFANA — Dashboard UI (http://localhost:3000)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=changeme_on_first_login
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    depends_on:
+      - prometheus
+      - loki
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS — Metrics scraping & storage (http://localhost:9090)
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=90d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # NODE EXPORTER — Host system metrics for MacPro / server
+  # ---------------------------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node-exporter
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "9100:9100"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # LOKI — Log aggregation backend (http://localhost:3100)
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # PROMTAIL — Log shipper: tails local logs + receives syslog from network gear
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "1514:1514/udp"   # Syslog receiver — point router/switches here
+      - "9080:9080"       # Promtail UI
+    volumes:
+      - /var/log:/var/log:ro
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # TELEGRAF — SNMP polling + additional metrics ingestion
+  # ---------------------------------------------------------------------------
+  telegraf:
+    image: telegraf:1.29-alpine
+    container_name: telegraf
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "9273:9273"   # Prometheus metrics exposition endpoint
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      - HOST_PROC=/host/proc
+      - HOST_SYS=/host/sys
+      - HOST_ETC=/host/etc
+    labels:
+      - "stack=observability"
+
+  # ---------------------------------------------------------------------------
+  # ALERTMANAGER — Routes alerts to email/Slack/PagerDuty (http://localhost:9093)
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    restart: unless-stopped
+    networks:
+      - observability
+    ports:
+      - "9093:9093"
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    labels:
+      - "stack=observability"

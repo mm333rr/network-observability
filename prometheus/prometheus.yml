@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'capes-macpro'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+
+  # MacPro host metrics via Node Exporter
+  - job_name: 'node-exporter-macpro'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          host: 'macpro'
+          location: 'capes-ventura'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Alertmanager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # Telegraf Prometheus endpoint (SNMP + other metrics)
+  - job_name: 'telegraf'
+    static_configs:
+      - targets: ['telegraf:9273']
+
+  # Target server 192.168.1.35 — if node_exporter is installed on it
+  # Uncomment and install node_exporter on .35 to enable
+  # - job_name: 'node-exporter-server35'
+  #   static_configs:
+  #     - targets: ['192.168.1.35:9100']
+  #       labels:
+  #         host: 'server-35'

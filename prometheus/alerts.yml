@@ -1,0 +1,64 @@
+groups:
+  - name: host_alerts
+    rules:
+      # Disk usage > 85%
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.host }}"
+          description: "Boot volume has less than 15% free. Current: {{ $value | printf \"%.1f\" }}% free."
+
+      # 4TB volume > 90% full
+      - alert: DataVolumeCritical
+        expr: (node_filesystem_avail_bytes{mountpoint=~"/Volumes/.*"} / node_filesystem_size_bytes{mountpoint=~"/Volumes/.*"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Data volume nearly full: {{ $labels.mountpoint }}"
+          description: "Volume {{ $labels.mountpoint }} has less than 10% free."
+
+      # CPU > 90% for 10 minutes
+      - alert: HighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 10+ minutes."
+
+      # RAM usage > 90%
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
+
+  - name: network_alerts
+    rules:
+      # Target instance down
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} is DOWN"
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 2+ minutes."
+
+      # High network errors on interface
+      - alert: NetworkErrors
+        expr: rate(node_network_transmit_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network errors on {{ $labels.instance }} interface {{ $labels.device }}"
+          description: "TX errors at {{ $value | printf \"%.1f\" }}/sec."
