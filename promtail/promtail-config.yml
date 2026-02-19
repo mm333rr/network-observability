@@ -30,8 +30,28 @@ scrape_configs:
           host: macpro
           __path__: /var/log/install.log
 
-  # Syslog receiver — network devices (routers, switches, APs) push UDP syslog here
-  # Configure your router to send syslog to: <MacPro-IP>:1514
+  # Plex Media Server logs
+  - job_name: plex
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: plex
+          host: macpro
+          app: plex-media-server
+          __path__: /plex-logs/*.log
+
+  - job_name: plex-plugins
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: plex-plugins
+          host: macpro
+          app: plex-media-server
+          __path__: /plex-logs/PMS Plugin Logs/*.log
+
+  # Syslog receiver — network devices push UDP syslog here
   - job_name: syslog-network
     syslog:
       listen_address: 0.0.0.0:1514
