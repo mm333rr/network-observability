@@ -11,7 +11,7 @@ clients:
 scrape_configs:
 
   # -------------------------------------------------------------------------
-  # macOS system logs — includes subdirectories (launchd, displaypolicy, etc.)
+  # macOS system logs
   # -------------------------------------------------------------------------
   - job_name: macos-system
     static_configs:
@@ -35,8 +35,25 @@ scrape_configs:
           __path__: /var/log/install.log
 
   # -------------------------------------------------------------------------
-  # Plex Media Server logs — with severity extraction pipeline
-  # Format: "Feb 18, 2026 18:11:00.455 [0x...] DEBUG - ..."
+  # Plex Media Server — main log
+  #
+  # Log format:
+  #   Feb 18, 2026 21:20:31.264 [0x70000909a000] LEVEL - message
+  #
+  # Enriched pipeline extracts:
+  #   level       — DEBUG / INFO / WARN / ERROR / VERBOSE
+  #   plex_event  — request | completed | transcode | scanner |
+  #                 error | warning | push | ssdp | other
+  #   method      — GET / POST / PUT / DELETE (from Request/Completed lines)
+  #   endpoint    — URL path stub (first 2 path segments, no query string)
+  #   client_ip   — source IP from Request lines
+  #   client_device — X-Plex-Device-Name header value (Safari, iPhone, AppleTV…)
+  #   client_platform — X-Plex-Platform header value
+  #   client_product  — X-Plex-Product header value
+  #   http_status — numeric HTTP status from Completed lines
+  #   response_ms — response time in ms from Completed lines
+  #   user        — X-Plex-Token owner string from "Token (username)" pattern
+  #   live_count  — concurrent live sessions count from "N live" pattern
   # -------------------------------------------------------------------------
   - job_name: plex
     static_configs:
@@ -46,12 +63,128 @@ scrape_configs:
           job: plex
           host: macpro
           app: plex-media-server
-          __path__: /plex-logs/*.log
+          __path__: /plex-logs/Plex Media Server.log
     pipeline_stages:
+
+      # 1. Extract timestamp, thread, level from every line
       - regex:
-          expression: '^\w+ \d+, \d+ [\d:.]+\s+\[.*?\]\s+(?P<level>\w+)\s+-'
+          expression: '^(?P<ts>\w+ \d+, \d+ [\d:.]+)\s+\[(?P<thread>[^\]]+)\]\s+(?P<level>\w+)\s+-\s+(?P<msg>.*)'
+
+      # 2. Promote level as a label
       - labels:
           level:
+
+      # 3. Classify event type from message prefix/content
+      - regex:
+          source: msg
+          expression: '^(?P<_etype>Request:|Completed:|Push:|SSDP|Transcode|transcode|MetadataAgent|Scanner|ERROR|WARN)'
+      - template:
+          source: plex_event
+          template: |
+            {{ if .msg | regexMatch "^Request:" }}request
+            {{ else if .msg | regexMatch "^Completed:" }}completed
+            {{ else if .msg | regexMatch "(?i)transcode" }}transcode
+            {{ else if .msg | regexMatch "(?i)scanner|MetadataAgent" }}scanner
+            {{ else if .msg | regexMatch "^Push:" }}push
+            {{ else if .msg | regexMatch "(?i)ssdp" }}ssdp
+            {{ else if eq .level "ERROR" }}error
+            {{ else if eq .level "WARN" }}warning
+            {{ else }}other
+            {{ end }}
+      - labels:
+          plex_event:
+
+      # 4. Extract HTTP method + endpoint from Request lines
+      #    "Request: [IP:PORT (label)] METHOD /path (N live) ..."
+      - regex:
+          source: msg
+          expression: 'Request:\s+\[[^\]]+\]\s+(?P<method>GET|POST|PUT|DELETE|HEAD|OPTIONS)\s+(?P<_raw_path>/[^\s?&#(]*)'
+      - template:
+          source: endpoint
+          template: '{{ regexReplaceAll "/[a-zA-Z0-9]{20,}" ._raw_path "/:{token}" }}'
+      - labels:
+          method:
+          endpoint:
+
+      # 5. Extract client IP from Request lines
+      - regex:
+          source: msg
+          expression: 'Request:\s+\[(?P<client_ip>[\d.:a-fA-F]+):\d+'
+      - labels:
+          client_ip:
+
+      # 6. Extract live session count
+      - regex:
+          source: msg
+          expression: '\((?P<live_count>\d+) live\)'
+
+      # 7. Extract user token label  "Token (username)"
+      - regex:
+          source: msg
+          expression: 'Token \((?P<user>[^)]+)\)'
+      - labels:
+          user:
+
+      # 8. Extract HTTP status + response time from Completed lines
+      #    "Completed: [IP] STATUS METHOD /path (N live) #id TIMEms BYTES bytes"
+      - regex:
+          source: msg
+          expression: 'Completed:\s+\[[^\]]+\]\s+(?P<http_status>\d{3})\s+\w+\s+\S+.*?#\w+\s+(?P<response_ms>\d+)ms'
+
+      # 9. Extract Plex client metadata from request headers in message
+      - regex:
+          source: msg
+          expression: 'X-Plex-Device-Name => (?P<client_device>[^/\s]+(?:\s[^/]+)??)(?:\s*\/|\s*$)'
+      - regex:
+          source: msg
+          expression: 'X-Plex-Platform => (?P<client_platform>[^\s/]+)'
+      - regex:
+          source: msg
+          expression: 'X-Plex-Product => (?P<client_product>[^\s/]+(?:\s[^\s/]+)??)(?:\s*\/|\s)'
+      - labels:
+          client_device:
+          client_platform:
+          client_product:
+
+      # 10. Drop noisy VERBOSE/DEBUG polling lines to reduce log volume
+      #     Keep: everything that isn't a routine /status/sessions poll
+      - drop:
+          source: msg
+          expression: '(VERBOSE|DEBUG).*(/status/sessions|Didn.t receive a request|It took \d+\.\d+ sec to serialize a list with 0)'
+
+  # -------------------------------------------------------------------------
+  # Plex Media Server — scanner/analysis logs (separate jobs for cleaner filtering)
+  # -------------------------------------------------------------------------
+  - job_name: plex-scanner
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: plex-scanner
+          host: macpro
+          app: plex-media-server
+          __path__: /plex-logs/Plex Media Scanner*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ts>\w+ \d+, \d+ [\d:.]+)\s+\[.*?\]\s+(?P<level>\w+)\s+-\s+(?P<msg>.*)'
+      - labels:
+          level:
+      - drop:
+          source: level
+          expression: '^(VERBOSE|DEBUG)$'
+
+  # -------------------------------------------------------------------------
+  # Plex Transcoder Statistics log
+  # -------------------------------------------------------------------------
+  - job_name: plex-transcoder
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: plex-transcoder
+          host: macpro
+          app: plex-media-server
+          __path__: /plex-logs/Plex Transcoder Statistics.log
 
   # -------------------------------------------------------------------------
   # Plex plugin logs
@@ -65,10 +198,14 @@ scrape_configs:
           host: macpro
           app: plex-media-server
           __path__: /plex-logs/PMS Plugin Logs/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ts>\w+ \d+, \d+ [\d:.]+)\s+\[.*?\]\s+(?P<level>\w+)\s+-\s+(?P<msg>.*)'
+      - labels:
+          level:
 
   # -------------------------------------------------------------------------
-  # Docker container logs — auto-discovers all running containers
-  # Uses Docker socket mounted from macOS Docker Desktop
+  # Docker container logs
   # -------------------------------------------------------------------------
   - job_name: docker-containers
     docker_sd_configs:
@@ -86,7 +223,19 @@ scrape_configs:
         replacement: 'macpro'
 
   # -------------------------------------------------------------------------
-  # Syslog receiver — network devices push UDP syslog here
+  # macOS system logs
+  # -------------------------------------------------------------------------
+  - job_name: macos-system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: macos-system
+          host: macpro
+          __path__: /var/log/**/*.log
+
+  # -------------------------------------------------------------------------
+  # Syslog receiver — network devices
   # -------------------------------------------------------------------------
   - job_name: syslog-network
     syslog:

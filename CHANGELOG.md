@@ -1,5 +1,65 @@
 # CHANGELOG — NetworkObservability Stack
 
+## [2.2.0] — 2026-02-19
+
+### Added — Plex enrichment
+
+**Metrics (`scripts/plex_metrics.sh`)**
+- Rewrote from scratch in pure bash/awk (no Python/jq — Telegraf image has neither)
+- `plex_stream_info` — per-session gauge with labels: `user`, `player`, `device`,
+  `platform`, `state`, `media_type`, `video_resolution`, `audio_codec`,
+  `video_codec`, `decision` (direct/transcode)
+- `plex_stream_bitrate_kbps` — per-session bitrate with same label set
+- `plex_library_section` — one gauge per library section with `section`, `type`, `key`
+- Both sessions and library fetched in single script invocation; library is best-effort
+
+**Logs (`promtail/promtail-config.yml`)**
+- Replaced monolithic `plex` job with four focused jobs:
+  - `plex` — main server log with enriched pipeline (drops noisy VERBOSE polling)
+  - `plex-scanner` — scanner/analysis logs (drops VERBOSE/DEBUG)
+  - `plex-transcoder` — Plex Transcoder Statistics log
+  - `plex-plugins` — Plugin Logs subdirectory
+- Main plex pipeline extracts labels: `level`, `plex_event`, `method`, `endpoint`,
+  `client_ip`, `user`, `client_device`, `client_platform`, `client_product`,
+  `http_status`, `response_ms`, `live_count`
+- Drop stage silences routine `/status/sessions` polling (Telegraf-generated) to
+  reduce log volume by ~80%
+
+**Grafana (`grafana/dashboards/plex.json`)**
+- New dashboard UID `capes-plex` — "🎬 Plex Media Server"
+- 26 panels across 5 rows:
+  - **Status row**: Plex up/down, active streams, direct/transcode counts, error/warn
+    5-minute counts from Loki
+  - **Stream Activity**: stacked timeseries of stream counts + bitrate timeseries
+  - **Client Breakdown**: bargauge by platform / device / user / media type /
+    resolution / decision
+  - **Libraries**: table of library sections with type/key labels
+  - **Logs**: Errors & Warnings · Request log · Scanner/Metadata · Transcoder ·
+    All-plex live tail — all as Loki log panels
+
+**Home dashboard (`grafana/dashboards/home.json`)**
+- Added Plex row (id 200–205): server up/down, active streams, transcoding count,
+  errors-5m, and a navigation link card to the Plex dashboard
+- Added Plex dashboard link to the Quick Links table
+
+## [2.1.0] — 2026-02-18
+
+### Fixed
+- **Node Exporter: macOS network interfaces not visible** — Docker Desktop runs node-exporter in a
+  Linux VM network namespace; `en0`/`en1` were never visible, only `eth0`/`lo`/tunnel adapters.
+  - Added `host-metrics/write_net_metrics.sh` — runs natively on macOS, reads `netstat -ib` for
+    real interface counters (en0, en1, en2, en3), writes `host-metrics/net_metrics.prom` atomically.
+  - Added `host-metrics/com.capes.net-metrics.plist` — LaunchAgent runs the script every 30s.
+    Load with: `cp host-metrics/com.capes.net-metrics.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.capes.net-metrics.plist`
+  - Updated `telegraf/telegraf.conf` `[[inputs.file]]` to include `net_metrics.prom` alongside
+    `disk_metrics.prom` and `smart_metrics.prom`.
+  - Metrics flowing: `net_bytes_recv_total`, `net_bytes_sent_total`, `net_packets_recv/sent_total`,
+    `net_errors_recv/sent_total`, `net_drops_recv_total`, `net_link_up` — all with `interface` label.
+- **Plex metrics: token placeholder in script** — `plex_metrics.sh` had hardcoded fallback
+  `YOUR_PLEX_TOKEN_HERE`; removed fallback so Telegraf exec `environment` block is the sole source.
+  The real token was already correctly set in `.env` and passed to the container; Plex metrics were
+  actually functioning — confirmed with live API test returning `plex_up=1`, `plex_active_streams=0`.
+
 ## [2.0.0] — 2026-02-18
 
 ### Added

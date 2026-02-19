@@ -1,5 +1,5 @@
 {
-  "title": "Capes Homelab — Overview",
+  "title": "Capes Homelab \u2014 Overview",
   "uid": "capes-home",
   "tags": [
     "home",
@@ -7,12 +7,12 @@
   ],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "panels": [
     {
       "type": "text",
-      "title": "🏠 The Capes — Network Observability",
+      "title": "\ud83c\udfe0 The Capes \u2014 Network Observability",
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -22,7 +22,7 @@
       "id": 1,
       "options": {
         "mode": "markdown",
-        "content": "# 🏠 The Capes Homelab — Mac Pro · 192.168.1.30\n\n**Stack:** Prometheus · Grafana · Loki · Promtail · Telegraf · Alertmanager · Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| 🖥️ Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| 📋 Log Browser | [Loki Logs](/d/sadlil-loki-apps-dashboard/logs) |\n| 📡 Telegraf System | [Telegraf System](/d/telegraf-macpro-system/telegraf-system) |\n| 🌐 Network / SNMP | [SNMP Stats](/d/capes-network-snmp/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) · [Alertmanager](http://localhost:9093) · [Promtail](http://localhost:9080)"
+        "content": "# \ud83c\udfe0 The Capes Homelab \u2014 Mac Pro \u00b7 192.168.1.30\n\n**Stack:** Prometheus \u00b7 Grafana \u00b7 Loki \u00b7 Promtail \u00b7 Telegraf \u00b7 Alertmanager \u00b7 Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| \ud83d\udda5\ufe0f Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| \ud83d\udccb Log Browser | [Loki Logs](/d/sadlil-loki-apps-dashboard/logs) |\n| \ud83d\udce1 Telegraf System | [Telegraf System](/d/telegraf-macpro-system/telegraf-system) |\n| \ud83c\udf10 Network / SNMP | [SNMP Stats](/d/capes-network-snmp/snmp-stats) |\n\n| \ud83c\udfac Plex Media Server | [Plex Dashboard](/d/capes-plex/plex-media-server) |\n\n**Quick links:** [Prometheus](http://localhost:9090) \u00b7 [Alertmanager](http://localhost:9093) \u00b7 [Promtail](http://localhost:9080)"
       }
     },
     {
@@ -353,19 +353,19 @@
               "type": "value",
               "options": {
                 "7": {
-                  "text": "7/7 ALL UP ✅"
+                  "text": "7/7 ALL UP \u2705"
                 },
                 "6": {
-                  "text": "6/7 ⚠️"
+                  "text": "6/7 \u26a0\ufe0f"
                 },
                 "5": {
-                  "text": "5/7 ⚠️"
+                  "text": "5/7 \u26a0\ufe0f"
                 },
                 "4": {
-                  "text": "4/7 ❌"
+                  "text": "4/7 \u274c"
                 },
                 "3": {
-                  "text": "3/7 ❌"
+                  "text": "3/7 \u274c"
                 }
               }
             }
@@ -399,7 +399,7 @@
     },
     {
       "type": "timeseries",
-      "title": "CPU Usage — Mac Pro (8-core Xeon E5 · 3GHz)",
+      "title": "CPU Usage \u2014 Mac Pro (8-core Xeon E5 \u00b7 3GHz)",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -441,7 +441,7 @@
     },
     {
       "type": "timeseries",
-      "title": "RAM Usage — 64 GB",
+      "title": "RAM Usage \u2014 64 GB",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -584,11 +584,11 @@
                     "type": "value",
                     "options": {
                       "1": {
-                        "text": "🟢  UP",
+                        "text": "\ud83d\udfe2  UP",
                         "color": "green"
                       },
                       "0": {
-                        "text": "🔴  DOWN",
+                        "text": "\ud83d\udd34  DOWN",
                         "color": "red"
                       }
                     }
@@ -644,6 +644,285 @@
           "format": "table"
         }
       ]
+    },
+    {
+      "type": "row",
+      "id": 200,
+      "title": "\ud83c\udfac Plex Media Server",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "type": "stat",
+      "id": 201,
+      "title": "Plex Server",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "\ud83d\udd34 DOWN"
+                },
+                "1": {
+                  "text": "\ud83d\udfe2 UP"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "plex_up{host=\"macpro\"}",
+          "legendFormat": "Plex",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 202,
+      "title": "Active Streams",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 4,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 6
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "plex_active_streams{host=\"macpro\"}",
+          "legendFormat": "Streams",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 203,
+      "title": "Transcoding",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 7,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "plex_transcoding_streams{host=\"macpro\"}",
+          "legendFormat": "Transcoding",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "id": 204,
+      "title": "Plex Errors (5m)",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 10,
+        "y": 17
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "count_over_time({job=\"plex\",level=\"ERROR\"}[5m])",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": 205,
+      "title": "",
+      "gridPos": {
+        "h": 4,
+        "w": 10,
+        "x": 13,
+        "y": 17
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### [\ud83c\udfac Open Plex Dashboard \u2192](/d/capes-plex/plex-media-server)\n\nStreams \u00b7 transcoding \u00b7 client breakdown \u00b7 errors \u00b7 live logs\n\n[Plex Web UI \u2197](http://localhost:32400/web)"
+      }
     }
   ]
 }
