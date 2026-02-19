@@ -86,17 +86,18 @@ soap_call() {
 }
 
 # ---------------------------------------------------------------------------
-# Helper: extract a single XML tag value from SOAP response
+# Helper: extract a single XML tag value from SOAP response (no python3)
+# Uses grep+sed — works in Alpine/Debian containers with no extra deps.
 # ---------------------------------------------------------------------------
 xml_val() {
     local xml="$1"
     local tag="$2"
-    echo "$xml" | python3 -c "
-import sys, re
-xml = sys.stdin.read()
-m = re.search(r'<${tag}>(.*?)</${tag}>', xml, re.DOTALL)
-print(m.group(1).strip() if m else '')
-" 2>/dev/null
+    printf '%s' "$xml" \
+      | tr -d '\r' \
+      | grep -oE "<${tag}>[^<]*</${tag}>" \
+      | sed "s|<${tag}>\(.*\)</${tag}>|\1|" \
+      | head -1 \
+      | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # ---------------------------------------------------------------------------
@@ -196,97 +197,104 @@ echo "orbi_radio_info{host=\"${HOST_LABEL}\",device=\"${ROUTER_LABEL}\",ssid=\"$
 # ---------------------------------------------------------------------------
 DEV2_XML=$(soap_call "DeviceInfo:1" "GetAttachDevice2")
 
-# Parse with Python — write XML to temp file to avoid heredoc/stdin piping issues
-PARSE_TMP=$(mktemp /tmp/orbi_dev2_XXXXXX.xml)
-echo "$DEV2_XML" > "$PARSE_TMP"
-
-DEVICE_METRICS=$(python3 /dev/stdin "$PARSE_TMP" "$ROUTER_MAC" "$HOST_LABEL" "$ROUTER_LABEL" <<'PYEOF'
-import sys, re
-
-xml_file = sys.argv[1]
-ROUTER_MAC = sys.argv[2].upper()
-HOST = sys.argv[3]
-DEVICE = sys.argv[4]
-
-with open(xml_file) as f:
-    xml = f.read()
-
-devices = re.findall(r'<Device>(.*?)</Device>', xml, re.DOTALL)
-
-total = len(devices)
-wired = 0
-wireless_24 = 0
-wireless_5 = 0
-ap_device_counts = {}
-rssi_lines = []
-speed_lines = []
-
-for dev in devices:
-    def tag(t):
-        m = re.search(fr'<{t}>(.*?)</{t}>', dev, re.DOTALL)
-        return m.group(1).strip() if m else ''
-
-    ip = tag('IP')
-    name = re.sub(r'[^a-zA-Z0-9_\-]', '_', tag('Name') or tag('n'))[:32]
-    mac = tag('MAC')
-    conn = tag('ConnectionType')
-    rssi = tag('SignalStrength')
-    linkspeed = tag('Linkspeed')
-    dev_type = tag('DeviceTypeV2')
-    brand = tag('DeviceBrand')
-    ap_mac = tag('ConnAPMAC').upper()
-
-    node = "router" if ap_mac == ROUTER_MAC else (
-        f"satellite_{ap_mac.replace(':','').lower()}" if ap_mac else "unknown"
-    )
-    ap_device_counts[node] = ap_device_counts.get(node, 0) + 1
-
-    if conn == 'wired':
-        wired += 1
-    elif '2.4' in conn:
-        wireless_24 += 1
-    elif '5' in conn:
-        wireless_5 += 1
-
-    if conn != 'wired' and rssi:
-        rssi_lines.append(
-            f'orbi_device_rssi{{host="{HOST}",name="{name}",'
-            f'ip="{ip}",mac="{mac}",band="{conn}",'
-            f'type="{dev_type}",brand="{brand}",node="{node}"}} {rssi}'
-        )
-    if conn != 'wired' and linkspeed:
-        speed_lines.append(
-            f'orbi_device_linkspeed_mbps{{host="{HOST}",name="{name}",'
-            f'ip="{ip}",mac="{mac}",band="{conn}",node="{node}"}} {linkspeed}'
-        )
-
-print(f'# HELP orbi_devices_total Total devices connected to Orbi mesh')
-print(f'# TYPE orbi_devices_total gauge')
-print(f'orbi_devices_total{{host="{HOST}",device="{DEVICE}"}} {total}')
-print()
-print(f'# HELP orbi_devices_by_connection Devices by connection type')
-print(f'# TYPE orbi_devices_by_connection gauge')
-print(f'orbi_devices_by_connection{{host="{HOST}",conn_type="wired"}} {wired}')
-print(f'orbi_devices_by_connection{{host="{HOST}",conn_type="2.4GHz"}} {wireless_24}')
-print(f'orbi_devices_by_connection{{host="{HOST}",conn_type="5GHz"}} {wireless_5}')
-print()
-print(f'# HELP orbi_node_device_count Devices connected to each Orbi mesh node')
-print(f'# TYPE orbi_node_device_count gauge')
-for node, count in sorted(ap_device_counts.items()):
-    print(f'orbi_node_device_count{{host="{HOST}",node="{node}"}} {count}')
-print()
-print(f'# HELP orbi_device_rssi Per-device WiFi signal strength (0-100 Orbi scale)')
-print(f'# TYPE orbi_device_rssi gauge')
-for l in rssi_lines:
-    print(l)
-print()
-print(f'# HELP orbi_device_linkspeed_mbps Per-device negotiated link speed in Mbps')
-print(f'# TYPE orbi_device_linkspeed_mbps gauge')
-for l in speed_lines:
-    print(l)
-PYEOF
-)
-rm -f "$PARSE_TMP"
+# Parse device list with awk — no python3 required (works in Alpine containers)
+# The XML has one tag per line after normalization; we parse Device blocks.
+DEVICE_METRICS=$(printf '%s' "$DEV2_XML" | tr -d '\r' | awk \
+  -v ROUTER_MAC="${ROUTER_MAC}" \
+  -v HOST="${HOST_LABEL}" \
+  -v DEVICE="${ROUTER_LABEL}" '
+function tag_val(xml, t,    pat, val) {
+    pat = "<" t ">([^<]*)</" t ">"
+    if (match(xml, "<" t ">[^<]*</" t ">")) {
+        val = substr(xml, RSTART + length(t) + 2, RLENGTH - length(t)*2 - 5)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+        return val
+    }
+    return ""
+}
+function safe_name(s,    r) {
+    r = s
+    gsub(/[^a-zA-Z0-9_-]/, "_", r)
+    if (length(r) > 32) r = substr(r, 1, 32)
+    return r
+}
+function upper(s,    r, i, c) {
+    r = s
+    for (i = 1; i <= length(r); i++) {
+        c = substr(r, i, 1)
+        if (c >= "a" && c <= "z") {
+            r = substr(r, 1, i-1) sprintf("%c", ord[c]) substr(r, i+1)
+        }
+    }
+    return r
+}
+BEGIN {
+    # Build ord map for uppercase
+    for (i = 97; i <= 122; i++) ord[sprintf("%c",i)] = i - 32
+    in_dev = 0; dev = ""
+    total = 0; wired = 0; g24 = 0; g5 = 0
+    rssi_out = ""; speed_out = ""; node_counts = ""
+    split("", node_cnt)
+}
+/<Device>/ { in_dev = 1; dev = ""; next }
+/<\/Device>/ {
+    in_dev = 0
+    ip   = tag_val(dev, "IP")
+    nm   = safe_name(tag_val(dev, "Name"))
+    mac  = tag_val(dev, "MAC")
+    conn = tag_val(dev, "ConnectionType")
+    rssi = tag_val(dev, "SignalStrength")
+    lspd = tag_val(dev, "Linkspeed")
+    dtyp = tag_val(dev, "DeviceTypeV2")
+    bran = tag_val(dev, "DeviceBrand")
+    apm  = tag_val(dev, "ConnAPMAC")
+    gsub(/:/, "", apm); apm_low = tolower(apm)
+    router_mac_no_colon = ROUTER_MAC; gsub(/:/, "", router_mac_no_colon)
+    if (tolower(apm_low) == tolower(router_mac_no_colon)) {
+        node = "router"
+    } else if (apm_low != "") {
+        node = "satellite_" apm_low
+    } else {
+        node = "unknown"
+    }
+    node_cnt[node]++
+    total++
+    if (conn == "wired") wired++
+    else if (index(conn, "2.4") > 0) g24++
+    else if (index(conn, "5") > 0) g5++
+    if (conn != "wired" && rssi != "") {
+        rssi_out = rssi_out "orbi_device_rssi{host=\"" HOST "\",name=\"" nm "\",ip=\"" ip "\",mac=\"" mac "\",band=\"" conn "\",type=\"" dtyp "\",brand=\"" bran "\",node=\"" node "\"} " rssi "\n"
+    }
+    if (conn != "wired" && lspd != "") {
+        speed_out = speed_out "orbi_device_linkspeed_mbps{host=\"" HOST "\",name=\"" nm "\",ip=\"" ip "\",mac=\"" mac "\",band=\"" conn "\",node=\"" node "\"} " lspd "\n"
+    }
+    next
+}
+in_dev { dev = dev $0 "\n"; next }
+END {
+    print "# HELP orbi_devices_total Total devices connected to Orbi mesh"
+    print "# TYPE orbi_devices_total gauge"
+    print "orbi_devices_total{host=\"" HOST "\",device=\"" DEVICE "\"} " total
+    print ""
+    print "# HELP orbi_devices_by_connection Devices by connection type"
+    print "# TYPE orbi_devices_by_connection gauge"
+    print "orbi_devices_by_connection{host=\"" HOST "\",conn_type=\"wired\"} " wired
+    print "orbi_devices_by_connection{host=\"" HOST "\",conn_type=\"2.4GHz\"} " g24
+    print "orbi_devices_by_connection{host=\"" HOST "\",conn_type=\"5GHz\"} " g5
+    print ""
+    print "# HELP orbi_node_device_count Devices connected to each Orbi mesh node"
+    print "# TYPE orbi_node_device_count gauge"
+    for (n in node_cnt) print "orbi_node_device_count{host=\"" HOST "\",node=\"" n "\"} " node_cnt[n]
+    print ""
+    print "# HELP orbi_device_rssi Per-device WiFi signal strength (0-100 Orbi scale)"
+    print "# TYPE orbi_device_rssi gauge"
+    printf "%s", rssi_out
+    print ""
+    print "# HELP orbi_device_linkspeed_mbps Per-device negotiated link speed in Mbps"
+    print "# TYPE orbi_device_linkspeed_mbps gauge"
+    printf "%s", speed_out
+}')
+: # device parsing complete
 
 echo ""
 echo "$DEVICE_METRICS"
@@ -307,22 +315,32 @@ echo ""
 echo "# HELP orbi_satellite_up 1 if satellite Orbi node responds to ping"
 echo "# TYPE orbi_satellite_up gauge"
 
-# Discover satellite IPs via arp cache (satellites have known OUI 10:0C:6B or C8:9E:43)
-SAT_IPS=$(arp -an 2>/dev/null | python3 -c "
-import sys, re
-ROUTER_MAC = 'c8:9e:43:44:24:ce'
-lines = sys.stdin.readlines()
-for line in lines:
-    # arp -an format: ? (192.168.1.1) at c8:9e:43:44:24:ce on en0 ...
-    m = re.search(r'\((\d+\.\d+\.\d+\.\d+)\) at ([0-9a-f:]+)', line)
-    if m:
-        ip, mac = m.group(1), m.group(2).lower()
-        # Orbi RBR/RBS OUIs: c8:9e:43, 10:0c:6b, 9c:3d:cf, 9c:ef:d5
-        if any(mac.startswith(oui) for oui in ['c8:9e:43','10:0c:6b','9c:3d:cf','9c:ef:d5']):
-            if mac != ROUTER_MAC:
-                name = 'satellite_' + mac.replace(':','')
-                print(f'{ip} {name}')
-" 2>/dev/null)
+# Discover satellite IPs via arp cache (Orbi OUIs: c8:9e:43, 10:0c:6b, 9c:3d:cf, 9c:ef:d5)
+# arp -an format: ? (192.168.1.x) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]
+SAT_IPS=$(arp -an 2>/dev/null | awk '
+BEGIN { ROUTER = "c89e434424ce" }
+{
+    # Extract IP and MAC
+    if (match($0, /\(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)/, ip_arr) &&
+        match($0, / at ([0-9a-f:]+) /, mac_arr)) {
+        ip  = ip_arr[1]
+        mac = mac_arr[1]
+    } else {
+        # Try simpler grep
+        gsub(/[()]/, " ")
+        ip  = $2
+        mac = $4
+    }
+    # Remove colons for comparison
+    mac_plain = mac; gsub(/:/, "", mac_plain)
+    if (mac_plain == "" || length(mac_plain) != 12) next
+    if (mac_plain == ROUTER) next
+    # Check Orbi OUIs
+    oui = substr(mac_plain, 1, 6)
+    if (oui == "c89e43" || oui == "100c6b" || oui == "9c3dcf" || oui == "9cef d5") {
+        print ip " satellite_" mac_plain
+    }
+}' 2>/dev/null)
 
 if [[ -n "$SAT_IPS" ]]; then
     while IFS=' ' read -r sat_ip sat_name; do
@@ -345,24 +363,19 @@ echo ""
 echo "# HELP orbi_ping_rtt_ms Round-trip latency in milliseconds (3-ping avg)"
 echo "# TYPE orbi_ping_rtt_ms gauge"
 
-_ping_rtt() {
+# macOS: "round-trip min/avg/max/stddev = 1.2/2.3/3.4/0.1 ms" → field 5 after /
+# Linux:  "rtt min/avg/max/mdev = 1.2/2.3/3.4/0.1 ms"         → field 5 after /
+_ping_avg() {
     local target="$1"
     ping -c 3 -q "$target" 2>/dev/null \
-      | grep -E "round-trip|rtt" \
-      | awk -F'[/= ]' '{
-          for(i=1;i<=NF;i++){
-            if($i ~ /^[0-9]+\.[0-9]+$/ && prev ~ /min/){print $i; exit}
-            prev=$i
-          }
-        }' \
-      | awk 'NR==2{print; exit} NR==1{prev=$0} END{if(!NR)print prev}' 2>/dev/null \
+      | grep -E "^(rtt|round-trip)" \
+      | awk -F'/' '{print $5}' \
     || echo "-1"
 }
 
-# macOS ping format: round-trip min/avg/max/stddev = 1.234/2.345/3.456/0.123 ms
-RTT_ROUTER=$(ping -c 3 -q "$ROUTER_IP" 2>/dev/null | grep "round-trip" | awk -F'/' '{print $5}' || echo "-1")
-RTT_CF=$(ping -c 3 -q "1.1.1.1" 2>/dev/null | grep "round-trip" | awk -F'/' '{print $5}' || echo "-1")
-RTT_G=$(ping -c 3 -q "8.8.8.8" 2>/dev/null | grep "round-trip" | awk -F'/' '{print $5}' || echo "-1")
+RTT_ROUTER=$(_ping_avg "$ROUTER_IP")
+RTT_CF=$(_ping_avg "1.1.1.1")
+RTT_G=$(_ping_avg "8.8.8.8")
 
 echo "orbi_ping_rtt_ms{host=\"${HOST_LABEL}\",target=\"router\",target_ip=\"${ROUTER_IP}\"} ${RTT_ROUTER:--1}"
 echo "orbi_ping_rtt_ms{host=\"${HOST_LABEL}\",target=\"cloudflare\",target_ip=\"1.1.1.1\"} ${RTT_CF:--1}"
@@ -375,15 +388,12 @@ echo ""
 echo "# HELP orbi_dns_resolve_ms DNS resolution time in milliseconds (0=failed)"
 echo "# TYPE orbi_dns_resolve_ms gauge"
 
-DNS_MS=$(python3 -c "
-import socket, time
-start = time.time()
-try:
-    socket.getaddrinfo('cloudflare.com', 80)
-    print(f'{(time.time()-start)*1000:.1f}')
-except:
-    print('0')
-" 2>/dev/null || echo "0")
+DNS_MS=$(
+    START=$(date +%s%3N 2>/dev/null || date +%s)
+    nslookup cloudflare.com >/dev/null 2>&1 || getent hosts cloudflare.com >/dev/null 2>&1 || true
+    END=$(date +%s%3N 2>/dev/null || date +%s)
+    echo $((END - START))
+)
 
 echo "orbi_dns_resolve_ms{host=\"${HOST_LABEL}\",resolver=\"system\"} ${DNS_MS}"
 
