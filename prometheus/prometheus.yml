@@ -37,6 +37,23 @@ scrape_configs:
     static_configs:
       - targets: ['telegraf:9273']
 
+  # cAdvisor — Docker container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          host: 'macpro'
+
+  # Loki — log aggregation backend metrics
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+
+  # Promtail — log shipper metrics
+  - job_name: 'promtail'
+    static_configs:
+      - targets: ['promtail:9080']
+
   # Target server 192.168.1.35 — if node_exporter is installed on it
   # Uncomment and install node_exporter on .35 to enable
   # - job_name: 'node-exporter-server35'

@@ -1,7 +1,10 @@
 {
-  "title": "Capes Homelab — Overview",
+  "title": "Capes Homelab \u2014 Overview",
   "uid": "capes-home",
-  "tags": ["home", "capes"],
+  "tags": [
+    "home",
+    "capes"
+  ],
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
@@ -9,140 +12,637 @@
   "panels": [
     {
       "type": "text",
-      "title": "🏠 The Capes — Network Observability",
-      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "title": "\ud83c\udfe0 The Capes \u2014 Network Observability",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "options": {
         "mode": "markdown",
-        "content": "# 🏠 The Capes Homelab — Mac Pro · 192.168.1.30\n\n**Stack:** Prometheus · Grafana · Loki · Promtail · Telegraf · Alertmanager · Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| 🖥️ Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| 📋 Log Browser | [Loki Logs](/d/liz0yRCZz/logs) |\n| 📡 Telegraf System | [Telegraf System](/d/000000074/telegraf-system-dashboard) |\n| 🌐 Network / SNMP | [SNMP Stats](/d/000000050/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) · [Alertmanager](http://localhost:9093) · [Promtail](http://localhost:9080)"
+        "content": "# \ud83c\udfe0 The Capes Homelab \u2014 Mac Pro \u00b7 192.168.1.30\n\n**Stack:** Prometheus \u00b7 Grafana \u00b7 Loki \u00b7 Promtail \u00b7 Telegraf \u00b7 Alertmanager \u00b7 Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| \ud83d\udda5\ufe0f Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| \ud83d\udccb Log Browser | [Loki Logs](/d/liz0yRCZz/logs) |\n| \ud83d\udce1 Telegraf System | [Telegraf System](/d/000000074/telegraf-system-dashboard) |\n| \ud83c\udf10 Network / SNMP | [SNMP Stats](/d/000000050/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) \u00b7 [Alertmanager](http://localhost:9093) \u00b7 [Promtail](http://localhost:9080)"
       }
     },
     {
       "type": "stat",
       "title": "Mac Pro Uptime",
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 4},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 4
+      },
       "id": 2,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
-          "color": {"mode": "thresholds"}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
-      "targets": [{"expr": "node_time_seconds{job=\"node-exporter-macpro\"} - node_boot_time_seconds{job=\"node-exporter-macpro\"}", "legendFormat": "Uptime", "refId": "A"}]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "node_time_seconds{job=\"node-exporter-macpro\"} - node_boot_time_seconds{job=\"node-exporter-macpro\"}",
+          "legendFormat": "Uptime",
+          "refId": "A"
+        }
+      ]
     },
     {
       "type": "stat",
       "title": "CPU Usage %",
-      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 4},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 4
+      },
       "id": 3,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "min": 0, "max": 100,
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
-          "color": {"mode": "thresholds"}
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "area"},
-      "targets": [{"expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)", "legendFormat": "CPU %", "refId": "A"}]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ]
     },
     {
       "type": "stat",
       "title": "RAM Used %",
-      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 4},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 4
+      },
       "id": 4,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "min": 0, "max": 100,
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
-          "color": {"mode": "thresholds"}
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "area"},
-      "targets": [{"expr": "(node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}) / node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} * 100", "legendFormat": "RAM %", "refId": "A"}]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "(node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}) / node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} * 100",
+          "legendFormat": "RAM %",
+          "refId": "A"
+        }
+      ]
     },
     {
       "type": "stat",
       "title": "4TB-R1 Free",
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 4},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 4
+      },
       "id": 5,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 107374182400}, {"color": "green", "value": 536870912000}]},
-          "color": {"mode": "thresholds"}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 107374182400
+              },
+              {
+                "color": "green",
+                "value": 536870912000
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
-      "targets": [{"expr": "node_filesystem_avail_bytes{mountpoint=~\"/Volumes/4tb.*\",job=\"node-exporter-macpro\"}", "legendFormat": "4TB Free", "refId": "A"}]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "disk_free_bytes{mount=\"/Volumes/4tb-R1\",host=\"macpro\"}",
+          "legendFormat": "4TB Free",
+          "refId": "A"
+        }
+      ]
     },
     {
       "type": "stat",
       "title": "Active Alerts",
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 4},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 4
+      },
       "id": 6,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]},
-          "color": {"mode": "thresholds"}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
-      "targets": [{"expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)", "legendFormat": "Firing", "refId": "A"}]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+          "legendFormat": "Firing",
+          "refId": "A"
+        }
+      ]
     },
     {
       "type": "stat",
-      "title": "Stack Health",
-      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 4},
+      "title": "Stack Health (7 services)",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 4
+      },
       "id": 7,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 4}, {"color": "green", "value": 5}]},
-          "color": {"mode": "thresholds"},
-          "mappings": [{"type": "value", "options": {"5": {"text": "ALL UP ✅"}, "4": {"text": "4/5 ⚠️"}, "3": {"text": "3/5 ❌"}}}]
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "yellow",
+                "value": 6
+              },
+              {
+                "color": "green",
+                "value": 7
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "7": {
+                  "text": "7/7 ALL UP \u2705"
+                },
+                "6": {
+                  "text": "6/7 \u26a0\ufe0f"
+                },
+                "5": {
+                  "text": "5/7 \u26a0\ufe0f"
+                },
+                "4": {
+                  "text": "4/7 \u274c"
+                },
+                "3": {
+                  "text": "3/7 \u274c"
+                }
+              }
+            }
+          ]
         }
       },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none"},
-      "targets": [{"expr": "count(up == 1)", "legendFormat": "Services Up", "refId": "A"}]
-    },
-    {
-      "type": "timeseries",
-      "title": "CPU Usage — Mac Pro (8-core Xeon E5 · 3GHz)",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-      "id": 8,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {"unit": "percent", "min": 0, "max": 100, "color": {"mode": "palette-classic"}},
-        "overrides": []
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
       },
-      "options": {"tooltip": {"mode": "multi"}, "legend": {"displayMode": "list", "placement": "bottom"}},
-      "targets": [{"expr": "100 - (avg by(cpu)(rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)", "legendFormat": "CPU {{cpu}}", "refId": "A"}]
-    },
-    {
-      "type": "timeseries",
-      "title": "RAM Usage — 64 GB",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-      "id": 9,
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {"unit": "bytes", "color": {"mode": "palette-classic"}},
-        "overrides": []
-      },
-      "options": {"tooltip": {"mode": "multi"}, "legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
-        {"expr": "node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}", "legendFormat": "Used", "refId": "A"},
-        {"expr": "node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}", "legendFormat": "Available", "refId": "B"}
+        {
+          "expr": "count(up == 1)",
+          "legendFormat": "Services Up",
+          "refId": "A"
+        },
+        {
+          "expr": "count(up)",
+          "legendFormat": "Total",
+          "refId": "B",
+          "hide": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage \u2014 Mac Pro (8-core Xeon E5 \u00b7 3GHz)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 - (avg by(cpu)(rate(node_cpu_seconds_total{mode=\"idle\",job=\"node-exporter-macpro\"}[5m])) * 100)",
+          "legendFormat": "CPU {{cpu}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RAM Usage \u2014 64 GB",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes{job=\"node-exporter-macpro\"} - node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}",
+          "legendFormat": "Used",
+          "refId": "A"
+        },
+        {
+          "expr": "node_memory_MemAvailable_bytes{job=\"node-exporter-macpro\"}",
+          "legendFormat": "Available",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Service Status",
+      "description": "Live up/down for all monitored services",
+      "id": 99,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "color-background",
+            "align": "center"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "job"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Service"
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "auto"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Endpoint"
+              },
+              {
+                "id": "custom.width",
+                "value": 220
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "auto"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "\ud83d\udfe2  UP",
+                        "color": "green"
+                      },
+                      "0": {
+                        "text": "\ud83d\udd34  DOWN",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Service",
+            "desc": false
+          }
+        ],
+        "cellHeight": "md"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "valueLabel": "job"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "host": true,
+              "location": true,
+              "environment": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "up",
+          "legendFormat": "{{job}} | {{instance}}",
+          "instant": true,
+          "refId": "A",
+          "format": "table"
+        }
       ]
     }
   ]

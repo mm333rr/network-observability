@@ -1,0 +1,45 @@
+# HELP smart_health SMART overall health (1=PASSED, 0=FAILED)
+# TYPE smart_health gauge
+# HELP smart_temperature_celsius Drive temperature in Celsius
+# TYPE smart_temperature_celsius gauge
+# HELP smart_reallocated_sectors Reallocated sector count (early failure indicator)
+# TYPE smart_reallocated_sectors gauge
+smart_health{disk="disk0",host="macpro"} 1
+smart_temperature_celsius{disk="disk0",host="macpro"} 58
+smart_reallocated_sectors{disk="disk0",host="macpro"} 0
+smart_health{disk="disk1",host="macpro"} 1
+smart_temperature_celsius{disk="disk1",host="macpro"} 58
+smart_reallocated_sectors{disk="disk1",host="macpro"} 0
+smart_health{disk="disk2",host="macpro"} 1
+smart_temperature_celsius{disk="disk2",host="macpro"} 42
+smart_reallocated_sectors{disk="disk2",host="macpro"} 0
+smart_health{disk="disk3",host="macpro"} 1
+smart_temperature_celsius{disk="disk3",host="macpro"} 40
+smart_reallocated_sectors{disk="disk3",host="macpro"} 0
+smart_health{disk="disk4",host="macpro"} 1
+smart_temperature_celsius{disk="disk4",host="macpro"} 43
+smart_reallocated_sectors{disk="disk4",host="macpro"} 0
+smart_health{disk="disk5",host="macpro"} 1
+smart_temperature_celsius{disk="disk5",host="macpro"} 40
+smart_reallocated_sectors{disk="disk5",host="macpro"} 0
+smart_health{disk="disk6",host="macpro"} 1
+smart_temperature_celsius{disk="disk6",host="macpro"} 40
+smart_reallocated_sectors{disk="disk6",host="macpro"} 0
+smart_health{disk="disk8",host="macpro"} 1
+smart_temperature_celsius{disk="disk8",host="macpro"} 42
+smart_reallocated_sectors{disk="disk8",host="macpro"} 0
+smart_health{disk="disk9",host="macpro"} 1
+smart_temperature_celsius{disk="disk9",host="macpro"} 34
+smart_reallocated_sectors{disk="disk9",host="macpro"} 0
+smart_health{disk="disk10",host="macpro"} 1
+smart_temperature_celsius{disk="disk10",host="macpro"} 33
+smart_reallocated_sectors{disk="disk10",host="macpro"} 0
+smart_health{disk="disk11",host="macpro"} 1
+smart_temperature_celsius{disk="disk11",host="macpro"} 34
+smart_reallocated_sectors{disk="disk11",host="macpro"} 0
+smart_health{disk="disk12",host="macpro"} 1
+smart_temperature_celsius{disk="disk12",host="macpro"} 34
+smart_reallocated_sectors{disk="disk12",host="macpro"} 0
+smart_health{disk="disk13",host="macpro"} 1
+smart_temperature_celsius{disk="disk13",host="macpro"} 42
+smart_reallocated_sectors{disk="disk13",host="macpro"} 0

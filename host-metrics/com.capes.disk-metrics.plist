@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.capes.disk-metrics</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Volumes/4tb-R1/Docker Services/NetworkObservability/host-metrics/write_disk_metrics.sh</string>
+  </array>
+
+  <!-- Run every 30 seconds -->
+  <key>StartInterval</key>
+  <integer>30</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/com.capes.disk-metrics.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/com.capes.disk-metrics.err</string>
+
+  <!-- Keep alive on failure -->
+  <key>KeepAlive</key>
+  <false/>
+</dict>
+</plist>

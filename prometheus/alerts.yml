@@ -41,7 +41,65 @@ groups:
           summary: "High memory usage on {{ $labels.instance }}"
           description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
 
-  - name: network_alerts
+  - name: macpro_disk_alerts
+    rules:
+      - alert: VolumeAlmostFull
+        expr: disk_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Volume {{ $labels.mount }} is {{ $value }}% full"
+          description: "Mac Pro volume {{ $labels.mount }} has exceeded 90% capacity."
+
+      - alert: VolumeCriticallyFull
+        expr: disk_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Volume {{ $labels.mount }} is {{ $value }}% full"
+          description: "Mac Pro volume {{ $labels.mount }} is nearly out of space."
+
+      - alert: SMARTFailure
+        expr: smart_health == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SMART failure on disk {{ $labels.disk }}"
+          description: "Drive {{ $labels.disk }} is reporting SMART health failure."
+
+      - alert: DriveTemperatureHigh
+        expr: smart_temperature_celsius > 55
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High drive temp on {{ $labels.disk }}: {{ $value }}°C"
+          description: "Drive {{ $labels.disk }} temperature exceeds 55°C for 10+ minutes."
+
+  - name: macpro_security_alerts
+    rules:
+      - alert: SSHLoginFailures
+        expr: increase(security_ssh_logins_failed[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Multiple SSH failures on macpro"
+          description: "{{ $value }} SSH login failures in the last 5 minutes."
+
+      - alert: PlexDown
+        expr: plex_up == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plex Media Server is unreachable"
+          description: "Plex on Mac Pro hasn't responded for 3+ minutes."
+
+  - name: infrastructure_alerts
     rules:
       # Target instance down
       - alert: InstanceDown
