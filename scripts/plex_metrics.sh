@@ -8,7 +8,7 @@
 # =============================================================================
 
 PLEX_URL="http://host.docker.internal:32400"
-PLEX_TOKEN="${PLEX_TOKEN:-YOUR_PLEX_TOKEN_HERE}"
+PLEX_TOKEN="${PLEX_TOKEN}"  # Injected by Telegraf exec environment block — set PLEX_TOKEN in .env
 HOST="macpro"
 
 # Active sessions
