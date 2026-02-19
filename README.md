@@ -1,41 +1,52 @@
-# NetworkObservability Stack
+# NetworkObservability Stack — The Capes Homelab
 
-Hybrid observability stack for The Capes homelab — MacPro host, migratable to Raspberry Pi.
+Hybrid observability stack for the Mac Pro at 192.168.1.30, The Capes, Ventura CA.
+Monitors host system metrics, Docker services, Plex, SMB, Orbi mesh network, and all LAN devices.
 
-**Stack:** Prometheus + Node Exporter + Telegraf (SNMP) + Loki + Promtail + Grafana + Alertmanager
+**Current version: 2.0.0**
 
-**Location:** `/Volumes/4tb-R1/Docker Services/NetworkObservability/`
+**Stack:** Prometheus · Grafana · Loki · Promtail · Telegraf · Alertmanager · Node Exporter · cAdvisor
 
 ---
 
 ## Architecture
 
 ```
-Network Devices (router/switch/AP)
-  │  syslog UDP → Promtail :1514
-  │  SNMP poll  ← Telegraf
+Orbi RBR750 Router (192.168.1.1)
+  │  SOAP API ←── telegraf (exec: orbi_metrics.sh every 30s)
+  │               per-device RSSI, linkspeed, mesh node, WAN, CPU/RAM
   │
-MacPro Host
-  │  /var/log/*  ← Promtail
-  │  host stats  ← Node Exporter :9100
+MacPro Host (192.168.1.30 · 8-core Xeon E5 · 64GB RAM · macOS 12)
+  │  /var/log/**   ←── Promtail
+  │  Docker logs   ←── Promtail (docker_sd_configs)
+  │  host stats    ←── Node Exporter :9100
+  │  custom metrics ←── Telegraf :9273
+  │      cpu, mem, disk, processes, SMART, Plex, SMB, security events
   │
-  ├── Prometheus :9090  ← scrapes Node Exporter, Telegraf :9273, Alertmanager
-  ├── Loki       :3100  ← receives from Promtail
-  ├── Alertmanager :9093 ← receives rules from Prometheus
-  └── Grafana    :3000  ← queries Prometheus + Loki → unified dashboards + alerts
+  ├── Prometheus   :9090  ← scrapes Node Exporter, Telegraf, Alertmanager
+  ├── Loki         :3100  ← receives logs from Promtail
+  ├── Alertmanager :9093  ← receives alert rules from Prometheus
+  ├── Grafana      :3000  ← queries Prometheus + Loki
+  └── cAdvisor     :8080  ← Docker container metrics
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Install Docker Desktop 4.28.0
-Docker Desktop 4.28.0 is the last version supporting macOS 12 Monterey.
-The DMG was downloaded to: `/Volumes/4tb-R1/Docker Services/Docker-4.28.0-macOS12.dmg`
+### Prerequisites
+- Docker Desktop 4.28.0 (last version supporting macOS 12 Monterey)
+  - DMG at `/Volumes/4tb-R1/Docker Services/Docker-4.28.0-macOS12.dmg`
+  - Docker Desktop 4.29+ requires macOS 14 Sonoma
 
-Install it, open Docker Desktop, and wait for the whale icon to show in the menu bar.
+### 1. Configure credentials
+```bash
+# Set router password for Orbi SOAP scraper
+export ROUTER_PASS="your_orbi_admin_password"
+# Or store in macOS Keychain:
+security add-generic-password -a orbi -s orbi_router -w "your_password"
+```
 
-### 2. Configure Alertmanager
 Edit `alertmanager/alertmanager.yml` with your email credentials:
 ```yaml
 smtp_from: 'alerts@yourdomain.com'
@@ -43,27 +54,14 @@ smtp_auth_username: 'your@gmail.com'
 smtp_auth_password: 'your_gmail_app_password'
 ```
 
-### 3. Configure SNMP on your router
-In `telegraf/telegraf.conf`, update the router IP:
-```
-agents = ["udp://192.168.1.1:161"]  # Replace with your router's IP
-community = "public"                  # Replace with your SNMP community string
-```
-Enable SNMP on your router (usually under Administration → SNMP).
-
-### 4. Configure syslog on network devices
-Point your router/switch syslog to: `<MacPro-IP>:1514` (UDP)
-
-### 5. Start the stack
+### 2. Start the stack
 ```bash
 cd "/Volumes/4tb-R1/Docker Services/NetworkObservability"
 ./manage.sh start
 ```
 
-### 6. Access Grafana
-Open http://localhost:3000
-Login: admin / changeme_on_first_login
-**Change your password immediately!**
+### 3. Access Grafana
+Open http://localhost:3000 (admin / admin — change on first login)
 
 ---
 
@@ -75,7 +73,7 @@ Login: admin / changeme_on_first_login
 | `./manage.sh stop` | Stop all services (data preserved) |
 | `./manage.sh restart` | Restart all services |
 | `./manage.sh status` | Show container status |
-| `./manage.sh logs grafana` | Tail logs for specific service |
+| `./manage.sh logs <service>` | Tail logs for specific service |
 | `./manage.sh pull` | Pull updated images |
 | `./manage.sh clean` | Remove everything including volumes ⚠️ |
 
@@ -86,62 +84,106 @@ Login: admin / changeme_on_first_login
 | Service | URL | Notes |
 |---|---|---|
 | Grafana | http://localhost:3000 | Main dashboard UI |
-| Prometheus | http://localhost:9090 | Metrics browser + query |
+| Prometheus | http://localhost:9090 | Metrics browser + PromQL |
 | Alertmanager | http://localhost:9093 | Alert routing UI |
 | Loki | http://localhost:3100 | Log backend (use via Grafana) |
 | Promtail | http://localhost:9080 | Log shipper status |
 | Telegraf | http://localhost:9273/metrics | Raw Prometheus metrics |
 | Node Exporter | http://localhost:9100/metrics | Host stats |
+| cAdvisor | http://localhost:8080 | Container metrics |
+
+---
+
+## Grafana Dashboards
+
+All dashboards live in `grafana/dashboards/` and are version-controlled.
+
+| File | UID | Title | Description |
+|---|---|---|---|
+| `home.json` | `capes-home` | Capes Homelab — Overview | Homepage with links to all dashboards |
+| `telegraf-macpro-system.json` | `telegraf-macpro-system` | 📊 Telegraf System — Mac Pro | CPU, RAM, disk, SMART, Plex, SMB, security |
+| `capes-network-orbi.json` | `capes-network-snmp` | 🌐 Network — Orbi Mesh & Capes LAN | Router health, per-device RSSI/speed, latency |
+| `node-exporter-full.json` | `rYdddlPWk` | Node Exporter Full | Detailed host metrics (community dashboard) |
+| `loki-logs.json` | `sadlil-loki-apps-dashboard` | 📋 Log Browser | Loki log explorer |
+
+---
+
+## Orbi SOAP Scraper (`scripts/orbi_metrics.sh`)
+
+The Netgear RBR750 does not support SNMP. We use the SOAP API instead.
+
+- **Endpoint:** `https://192.168.1.1/soap/server_sa/`
+- **Auth:** HTTP Basic (admin / `$ROUTER_PASS`)
+- **Interval:** 30 seconds
+- **Dependency:** pure awk/sed/grep — no Python, works in Alpine containers
+
+### Metrics produced
+
+| Metric | Labels | Description |
+|---|---|---|
+| `orbi_up` | — | Router reachable (1/0) |
+| `orbi_wan_up` | `wan_ip` | WAN connected (1/0) |
+| `orbi_cpu_utilization_pct` | — | Router CPU % |
+| `orbi_memory_utilization_pct` | — | Router RAM % |
+| `orbi_radio_up` | — | WiFi radio status |
+| `orbi_radio_info` | `ssid`, `channel`, `security` | WiFi info gauge |
+| `orbi_firmware_info` | `firmware`, `model`, `serial` | Firmware info gauge |
+| `orbi_devices_total` | — | Total connected devices |
+| `orbi_devices_by_connection` | `conn_type` | Count by 2.4GHz/5GHz/wired |
+| `orbi_node_device_count` | `node` | Count per mesh node |
+| `orbi_device_rssi` | `name`,`ip`,`mac`,`band`,`node`,`type`,`brand` | Per-device signal |
+| `orbi_device_linkspeed_mbps` | `name`,`ip`,`band` | Per-device link speed |
+| `orbi_satellite_up` | `satellite_mac` | Satellite node reachable |
+| `orbi_ping_rtt_ms` | `target`,`target_ip` | Ping RTT to router/Cloudflare/Google |
+| `orbi_dns_resolve_ms` | — | DNS resolution latency |
+
+---
+
+## Telegraf Host Metrics
+
+Telegraf runs in Docker, scraping the Mac Pro host via mounted paths and exec scripts.
+
+**Inputs configured:**
+- `cpu` — per-core and aggregate CPU usage
+- `mem` — RAM used/free/cached/available
+- `disk` — usage % and bytes per volume (/, /Volumes/4tb-R1, /Volumes/6tb-R1, /Volumes/500g-R1)
+- `processes` — running/sleeping/zombie process counts
+- `[[inputs.exec]] orbi_metrics.sh` — Orbi SOAP metrics (see above)
+- Custom exec scripts: Plex, SMB, SMART, security events
 
 ---
 
 ## Data Persistence
 
-All data lives in `./data/`:
-- `./data/prometheus/` — metrics time series (90 day retention)
-- `./data/grafana/` — dashboards, users, settings
-- `./data/loki/` — log data (90 day retention)
-- `./data/alertmanager/` — silence records
+All data lives in `./data/` (bind-mounted, on 4tb-R1):
+
+| Path | Contents | Retention |
+|---|---|---|
+| `./data/prometheus/` | Metrics time series | 90 days |
+| `./data/grafana/` | Dashboards, users, settings | Indefinite |
+| `./data/loki/` | Log data | 90 days |
+| `./data/alertmanager/` | Silence records | Indefinite |
 
 ---
 
-## Adding Server 192.168.1.35
+## Monitoring the .35 Server
 
-To also monitor the `.35` server:
-1. SSH into it and install Node Exporter:
-   ```bash
-   # On 192.168.1.35 (Linux)
-   docker run -d --pid=host --net=host \
-     -v /proc:/host/proc:ro -v /sys:/host/sys:ro -v /:/rootfs:ro \
-     --name node-exporter prom/node-exporter:latest
-   ```
+To also monitor `192.168.1.35` (Doris):
+1. Install Node Exporter on it (see `grafana/dashboards/` for Doris Overview dashboard)
 2. Uncomment the `node-exporter-server35` job in `prometheus/prometheus.yml`
-3. Run `./manage.sh restart`
+3. `./manage.sh restart`
 
 ---
 
 ## Migrating to Raspberry Pi
 
-All images used have ARM64 builds. To migrate:
+All images have ARM64 builds. To migrate:
 1. Copy this entire `NetworkObservability/` folder to the Pi
-2. Copy `./data/` directory to preserve historical data
-3. Install Docker on the Pi: `curl -sSL https://get.docker.com | sh`
+2. Copy `./data/` to preserve historical data
+3. `curl -sSL https://get.docker.com | sh` on the Pi
 4. `./manage.sh start`
 
-No configuration changes needed — everything uses container-internal networking.
-
----
-
-## Recommended Grafana Dashboards to Import
-
-After startup, import these from grafana.com (Dashboard → Import → Enter ID):
-
-| ID | Name |
-|---|---|
-| 1860 | Node Exporter Full |
-| 13639 | Logs / Loki |
-| 7587 | Telegraf: system dashboard |
-| 9734 | SNMP Stats |
+No config changes needed — everything uses container-internal networking.
 
 ---
 
@@ -154,22 +196,26 @@ NetworkObservability/
 ├── README.md
 ├── CHANGELOG.md
 ├── prometheus/
-│   ├── prometheus.yml      # Scrape targets
-│   └── alerts.yml          # Alert rules
+│   ├── prometheus.yml          # Scrape targets + retention config
+│   └── alerts.yml              # Alert rules (disk, CPU, mem, down)
 ├── loki/
 │   └── loki-config.yml
 ├── promtail/
-│   └── promtail-config.yml # Log sources + syslog receiver
+│   └── promtail-config.yml     # Log sources: /var/log, Docker SD, syslog UDP
 ├── telegraf/
-│   └── telegraf.conf       # SNMP + host metrics
+│   └── telegraf.conf           # Host metrics + Orbi SOAP exec input
 ├── alertmanager/
-│   └── alertmanager.yml    # Alert routing + email
+│   └── alertmanager.yml        # Alert routing + email (matt@am180.us)
+├── scripts/
+│   └── orbi_metrics.sh         # Orbi RBR750 SOAP API scraper v2.0.0
+├── host-metrics/
+│   └── disk_metrics.prom       # Static disk metrics (updated by cron)
 ├── grafana/
 │   ├── provisioning/
-│   │   ├── datasources/    # Auto-configured Prometheus + Loki
-│   │   └── dashboards/
-│   └── dashboards/         # JSON dashboard files go here
-└── data/                   # All persistent data (bind mounts)
+│   │   ├── datasources/        # Auto-configured Prometheus + Loki
+│   │   └── dashboards/         # Dashboard provisioning config
+│   └── dashboards/             # JSON dashboard exports (version-controlled)
+└── data/                       # Persistent bind-mount data (not in git)
     ├── prometheus/
     ├── grafana/
     ├── loki/
@@ -178,7 +224,7 @@ NetworkObservability/
 
 ---
 
-## Versions Pinned
+## Pinned Versions
 
 | Component | Version |
 |---|---|
@@ -189,4 +235,5 @@ NetworkObservability/
 | Promtail | 2.9.4 |
 | Telegraf | 1.29-alpine |
 | Alertmanager | 0.26.0 |
-| Docker Desktop | 4.28.0 (macOS 12 Monterey compatible) |
+| cAdvisor | 0.49.1 |
+| Docker Desktop | 4.28.0 (macOS 12 Monterey max) |
