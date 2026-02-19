@@ -71,13 +71,22 @@ groups:
           description: "Drive {{ $labels.disk }} is reporting SMART health failure."
 
       - alert: DriveTemperatureHigh
-        expr: smart_temperature_celsius > 55
+        expr: smart_temperature_celsius > 65
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "High drive temp on {{ $labels.disk }}: {{ $value }}°C"
-          description: "Drive {{ $labels.disk }} temperature exceeds 55°C for 10+ minutes."
+          description: "Drive {{ $labels.disk }} temperature exceeds 65°C for 10+ minutes. (disk0/disk1 are Apple SSD SM0256F PCIe — normal operating range up to 70°C)"
+
+      - alert: DriveTemperatureCritical
+        expr: smart_temperature_celsius > 70
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL drive temp on {{ $labels.disk }}: {{ $value }}°C"
+          description: "Drive {{ $labels.disk }} temperature exceeds 70°C — at or above Apple SSD SM0256F maximum spec."
 
   - name: macpro_security_alerts
     rules:

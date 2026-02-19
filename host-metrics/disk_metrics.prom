@@ -6,23 +6,23 @@
 # TYPE disk_used_bytes gauge
 # HELP disk_usage_percent Disk usage percentage (macOS host)
 # TYPE disk_usage_percent gauge
-disk_free_bytes{mount="/",volume="root",host="macpro"} 90380849152
+disk_free_bytes{mount="/",volume="root",host="macpro"} 90376785920
 disk_total_bytes{mount="/",volume="root",host="macpro"} 250790436864
 disk_used_bytes{mount="/",volume="root",host="macpro"} 15418306560
 disk_usage_percent{mount="/",volume="root",host="macpro"} 15
-disk_free_bytes{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 90380849152
+disk_free_bytes{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 90376785920
 disk_total_bytes{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 250790436864
-disk_used_bytes{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 142358601728
+disk_used_bytes{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 142362664960
 disk_usage_percent{mount="/System/Volumes/Data",volume="System_Volumes_Data",host="macpro"} 62
-disk_free_bytes{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 4720872468480
+disk_free_bytes{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 4720872480768
 disk_total_bytes{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 6000831135744
-disk_used_bytes{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 1279288107008
+disk_used_bytes{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 1279288094720
 disk_usage_percent{mount="/Volumes/6tb-R1",volume="Volumes_6tb-R1",host="macpro"} 22
 disk_free_bytes{mount="/Volumes/500g-R1",volume="Volumes_500g-R1",host="macpro"} 478353203200
 disk_total_bytes{mount="/Volumes/500g-R1",volume="Volumes_500g-R1",host="macpro"} 499763773440
 disk_used_bytes{mount="/Volumes/500g-R1",volume="Volumes_500g-R1",host="macpro"} 21249744896
 disk_usage_percent{mount="/Volumes/500g-R1",volume="Volumes_500g-R1",host="macpro"} 5
-disk_free_bytes{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 556661506048
+disk_free_bytes{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 556664840192
 disk_total_bytes{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 4000443006976
-disk_used_bytes{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 3443296309248
+disk_used_bytes{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 3443292975104
 disk_usage_percent{mount="/Volumes/4tb-R1",volume="Volumes_4tb-R1",host="macpro"} 87
