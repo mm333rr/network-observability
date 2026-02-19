@@ -158,10 +158,12 @@ CPU_PCT=$(xml_val "$SYS_XML" "NewCPUUtilization")
 MEM_PCT=$(xml_val "$SYS_XML" "NewMemoryUtilization")
 MEM_MB=$(xml_val "$SYS_XML" "NewPhysicalMemory")
 
-echo ""
-echo "# HELP orbi_cpu_utilization_pct Router CPU utilization percent"
-echo "# TYPE orbi_cpu_utilization_pct gauge"
-echo "orbi_cpu_utilization_pct{host=\"${HOST_LABEL}\",device=\"${ROUTER_LABEL}\"} ${CPU_PCT:-0}"
+# NOTE: orbi_cpu_utilization_pct is intentionally NOT emitted.
+# The RBR750 SOAP GetSystemInfo endpoint returns NewCPUUtilization=100 at all
+# times regardless of actual load — confirmed across firmware V7.2.8.2_5.1.18.
+# This is a known Netgear firmware reporting bug (Netgear community #2052382).
+# Emitting it would permanently fire the OrbiHighCPU alert. Router health is
+# better measured via ping RTT to 192.168.1.1 and internet latency (section 8).
 
 echo ""
 echo "# HELP orbi_memory_utilization_pct Router RAM utilization percent"
@@ -300,61 +302,42 @@ echo ""
 echo "$DEVICE_METRICS"
 
 # ---------------------------------------------------------------------------
-# 7. Satellite node reachability via ping
-#    Satellites show up as AP MACs distinct from the router MAC.
-#    We derive their IPs from wired devices on those APs (wired backhaul clients).
-#    As a practical proxy: ping well-known satellite IP range or any wired-non-router device.
+# 7. Satellite node reachability — derived from active client count
+#
+# Orbi RBS750 satellites do not get a pingable LAN IP (they use a dedicated
+# backhaul subnet not exposed to DHCP/ARP) and no Netgear SOAP endpoint
+# exposes satellite IPs. The most reliable proxy: if devices are actively
+# connected TO a satellite's AP MAC (ConnAPMAC field), the satellite is up.
+#
+# We parse orbi_node_device_count lines already emitted by the awk block
+# and emit orbi_satellite_up=1 for any satellite with >=1 connected device.
+# Known satellite MACs with 0 connections emit orbi_satellite_up=0.
+#
+# Known satellites: 10:0C:6B:F1:AE:C5 (bedroom/office RBS750)
 # ---------------------------------------------------------------------------
 
-# Known satellite MACs → IPs can be found from the device list as ConnAPMAC owners.
-# The satellite itself (RBS node) connects its Ethernet/backhaul and won't appear
-# as a DHCP client. We ping the satellite's assumed management IP by deriving from
-# the connected devices. Simplest: ping the discovered satellite AP MAC via arp.
-
 echo ""
-echo "# HELP orbi_satellite_up 1 if satellite Orbi node responds to ping"
+echo "# HELP orbi_satellite_up 1 if satellite mesh node has active connected clients"
 echo "# TYPE orbi_satellite_up gauge"
 
-# Discover satellite IPs via arp cache (Orbi OUIs: c8:9e:43, 10:0c:6b, 9c:3d:cf, 9c:ef:d5)
-# arp -an format: ? (192.168.1.x) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]
-SAT_IPS=$(arp -an 2>/dev/null | awk '
-BEGIN { ROUTER = "c89e434424ce" }
-{
-    # Extract IP and MAC
-    if (match($0, /\(([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)/, ip_arr) &&
-        match($0, / at ([0-9a-f:]+) /, mac_arr)) {
-        ip  = ip_arr[1]
-        mac = mac_arr[1]
-    } else {
-        # Try simpler grep
-        gsub(/[()]/, " ")
-        ip  = $2
-        mac = $4
-    }
-    # Remove colons for comparison
-    mac_plain = mac; gsub(/:/, "", mac_plain)
-    if (mac_plain == "" || length(mac_plain) != 12) next
-    if (mac_plain == ROUTER) next
-    # Check Orbi OUIs
-    oui = substr(mac_plain, 1, 6)
-    if (oui == "c89e43" || oui == "100c6b" || oui == "9c3dcf" || oui == "9cef d5") {
-        print ip " satellite_" mac_plain
-    }
-}' 2>/dev/null)
+# Remaining known MACs that haven't appeared in DEVICE_METRICS output
+REMAINING_SATS=("100c6bf1aec5")
 
-if [[ -n "$SAT_IPS" ]]; then
-    while IFS=' ' read -r sat_ip sat_name; do
-        [[ -z "$sat_ip" ]] && continue
-        sat_up=0
-        if ping -c 1 -W 2 "$sat_ip" &>/dev/null; then
-            sat_up=1
-        fi
-        echo "orbi_satellite_up{host=\"${HOST_LABEL}\",satellite_ip=\"${sat_ip}\",satellite_name=\"${sat_name}\"} ${sat_up}"
-    done <<< "$SAT_IPS"
-else
-    echo "# No satellites detected in arp cache (may be online but not in arp table)"
-    echo "orbi_satellite_up{host=\"${HOST_LABEL}\",satellite_ip=\"none\",satellite_name=\"none\"} 0"
-fi
+while IFS= read -r line; do
+    [[ "$line" =~ orbi_node_device_count.*node=\"(satellite_([^\"]+))\".*[[:space:]]([0-9]+) ]] || continue
+    node="${BASH_REMATCH[1]}"
+    mac="${BASH_REMATCH[2]}"
+    count="${BASH_REMATCH[3]}"
+    sat_up=0; [[ "$count" -gt 0 ]] && sat_up=1
+    echo "orbi_satellite_up{host=\"${HOST_LABEL}\",satellite_mac=\"${mac}\",satellite_node=\"${node}\"} ${sat_up}"
+    REMAINING_SATS=("${REMAINING_SATS[@]/$mac}")
+done <<< "$DEVICE_METRICS"
+
+# Any known satellite not seen in device list at all → emit 0 (fully disconnected)
+for mac in "${REMAINING_SATS[@]}"; do
+    [[ -z "$mac" ]] && continue
+    echo "orbi_satellite_up{host=\"${HOST_LABEL}\",satellite_mac=\"${mac}\",satellite_node=\"satellite_${mac}\"} 0"
+done
 
 # ---------------------------------------------------------------------------
 # 8. Internet latency (ping RTT to router, Cloudflare, Google)

@@ -153,14 +153,19 @@ groups:
   # ===========================================================================
   - name: orbi_alerts
     rules:
-      - alert: OrbiHighCPU
-        expr: orbi_cpu_utilization_pct > 90
-        for: 10m
+      # OrbiHighCPU removed: RBR750 SOAP GetSystemInfo always reports
+      # NewCPUUtilization=100 regardless of actual load (firmware bug V7.2.8.2_5.1.18).
+      # Router health is monitored via ping RTT and internet latency instead.
+
+      # Sustained high router latency = overloaded or failing router
+      - alert: OrbiHighLatency
+        expr: orbi_ping_rtt_ms{target="router"} > 50
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Orbi router CPU at {{ $value | printf \"%.0f\" }}%"
-          description: "Orbi RBR750 CPU above 90% for 10+ minutes."
+          summary: "High latency to Orbi router: {{ $value | printf \"%.1f\" }}ms"
+          description: "Ping RTT to 192.168.1.1 above 50ms for 5+ minutes. Router may be overloaded."
 
       - alert: OrbiHighMemory
         expr: orbi_memory_utilization_pct > 85
@@ -171,14 +176,17 @@ groups:
           summary: "Orbi router memory at {{ $value | printf \"%.0f\" }}%"
           description: "Orbi RBR750 memory above 85% for 10+ minutes."
 
+      # Satellite up/down: derived from active client count (no pingable IP available)
+      # orbi_satellite_up=1 when >=1 device is connected to satellite AP MAC,
+      # orbi_satellite_up=0 when satellite is absent from ConnAPMAC device list.
       - alert: OrbiSatelliteDown
         expr: orbi_satellite_up == 0
-        for: 3m
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Orbi mesh satellite is unreachable"
-          description: "Orbi satellite has not responded for 3+ minutes. Mesh coverage may be degraded."
+          summary: "Orbi satellite {{ $labels.satellite_mac }} has no connected clients"
+          description: "Satellite {{ $labels.satellite_node }} has had zero connected devices for 5+ minutes. It may have dropped from the mesh. Check mesh status at http://192.168.1.1."
 
       - alert: OrbiWANDown
         expr: orbi_wan_up == 0
@@ -197,6 +205,16 @@ groups:
         annotations:
           summary: "Orbi router is unreachable"
           description: "Cannot reach Orbi RBR750 at 192.168.1.1 for 3+ minutes."
+
+      # Internet latency alert (separate from router latency)
+      - alert: InternetHighLatency
+        expr: orbi_ping_rtt_ms{target="cloudflare"} > 200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High internet latency: {{ $value | printf \"%.0f\" }}ms to Cloudflare"
+          description: "Ping to 1.1.1.1 above 200ms for 5+ minutes. Possible ISP issue or WAN congestion."
 
   # ===========================================================================
   # NFS mount health (detected via Telegraf disk_metrics)
