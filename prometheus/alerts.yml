@@ -1,7 +1,19 @@
+# =============================================================================
+# alerts.yml — Prometheus alerting rules for Capes Homelab
+# Host: Mac Pro 192.168.1.30 | NAS: mbuntu 192.168.1.35
+# All alerts:
+#   - use threshold expressions (not increase()) so they resolve cleanly
+#   - have repeat_interval set in alertmanager.yml (not here)
+#   - have both warning and critical tiers where appropriate
+# =============================================================================
+
 groups:
+
+  # ===========================================================================
+  # Node Exporter — Mac Pro system health (via node-exporter)
+  # ===========================================================================
   - name: host_alerts
     rules:
-      # Disk usage > 85%
       - alert: DiskSpaceLow
         expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
         for: 5m
@@ -11,7 +23,6 @@ groups:
           summary: "Low disk space on {{ $labels.host }}"
           description: "Boot volume has less than 15% free. Current: {{ $value | printf \"%.1f\" }}% free."
 
-      # 4TB volume > 90% full
       - alert: DataVolumeCritical
         expr: (node_filesystem_avail_bytes{mountpoint=~"/Volumes/.*"} / node_filesystem_size_bytes{mountpoint=~"/Volumes/.*"}) * 100 < 10
         for: 5m
@@ -21,7 +32,6 @@ groups:
           summary: "Data volume nearly full: {{ $labels.mountpoint }}"
           description: "Volume {{ $labels.mountpoint }} has less than 10% free."
 
-      # CPU > 90% for 10 minutes
       - alert: HighCPU
         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
         for: 10m
@@ -31,7 +41,6 @@ groups:
           summary: "High CPU on {{ $labels.instance }}"
           description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 10+ minutes."
 
-      # RAM usage > 90%
       - alert: HighMemoryUsage
         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
         for: 5m
@@ -41,6 +50,9 @@ groups:
           summary: "High memory usage on {{ $labels.instance }}"
           description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
 
+  # ===========================================================================
+  # Mac Pro local disk / SMART (via Telegraf exec scripts)
+  # ===========================================================================
   - name: macpro_disk_alerts
     rules:
       - alert: VolumeAlmostFull
@@ -49,7 +61,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Volume {{ $labels.mount }} is {{ $value }}% full"
+          summary: "Volume {{ $labels.mount }} is {{ $value | printf \"%.0f\" }}% full"
           description: "Mac Pro volume {{ $labels.mount }} has exceeded 90% capacity."
 
       - alert: VolumeCriticallyFull
@@ -58,7 +70,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "CRITICAL: Volume {{ $labels.mount }} is {{ $value }}% full"
+          summary: "CRITICAL: Volume {{ $labels.mount }} is {{ $value | printf \"%.0f\" }}% full"
           description: "Mac Pro volume {{ $labels.mount }} is nearly out of space."
 
       - alert: SMARTFailure
@@ -76,8 +88,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High drive temp on {{ $labels.disk }}: {{ $value }}°C"
-          description: "Drive {{ $labels.disk }} temperature exceeds 65°C for 10+ minutes. (disk0/disk1 are Apple SSD SM0256F PCIe — normal operating range up to 70°C)"
+          summary: "High drive temp on {{ $labels.disk }}: {{ $value | printf \"%.0f\" }}°C"
+          description: "Drive {{ $labels.disk }} temperature exceeds 65°C for 10+ minutes."
 
       - alert: DriveTemperatureCritical
         expr: smart_temperature_celsius > 70
@@ -85,19 +97,24 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "CRITICAL drive temp on {{ $labels.disk }}: {{ $value }}°C"
-          description: "Drive {{ $labels.disk }} temperature exceeds 70°C — at or above Apple SSD SM0256F maximum spec."
+          summary: "CRITICAL drive temp on {{ $labels.disk }}: {{ $value | printf \"%.0f\" }}°C"
+          description: "Drive {{ $labels.disk }} temperature exceeds 70°C — at or above Apple SSD SM0256F max spec."
 
+  # ===========================================================================
+  # Mac Pro security (via Telegraf exec scripts)
+  # Uses rate() over a window so the alert resolves when failures stop.
+  # ===========================================================================
   - name: macpro_security_alerts
     rules:
+      # rate() * 300 = events per 5-minute window; resolves when rate drops to 0
       - alert: SSHLoginFailures
-        expr: increase(security_ssh_logins_failed[5m]) > 5
-        for: 1m
+        expr: rate(security_ssh_logins_failed[5m]) * 300 > 5
+        for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "Multiple SSH failures on macpro"
-          description: "{{ $value }} SSH login failures in the last 5 minutes."
+          summary: "SSH brute-force on MacPro"
+          description: "More than 5 SSH login failures in a 5-minute window (current rate: {{ $value | printf \"%.0f\" }}/5m)."
 
       - alert: PlexDown
         expr: plex_up == 0
@@ -108,9 +125,11 @@ groups:
           summary: "Plex Media Server is unreachable"
           description: "Plex on Mac Pro hasn't responded for 3+ minutes."
 
+  # ===========================================================================
+  # Infrastructure — scrape target up/down, network errors
+  # ===========================================================================
   - name: infrastructure_alerts
     rules:
-      # Target instance down
       - alert: InstanceDown
         expr: up == 0
         for: 2m
@@ -120,12 +139,249 @@ groups:
           summary: "Instance {{ $labels.instance }} is DOWN"
           description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 2+ minutes."
 
-      # High network errors on interface
       - alert: NetworkErrors
         expr: rate(node_network_transmit_errs_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Network errors on {{ $labels.instance }} interface {{ $labels.device }}"
+          summary: "Network errors on {{ $labels.instance }} / {{ $labels.device }}"
           description: "TX errors at {{ $value | printf \"%.1f\" }}/sec."
+
+  # ===========================================================================
+  # Orbi router / mesh
+  # ===========================================================================
+  - name: orbi_alerts
+    rules:
+      - alert: OrbiHighCPU
+        expr: orbi_cpu_utilization_pct > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Orbi router CPU at {{ $value | printf \"%.0f\" }}%"
+          description: "Orbi RBR750 CPU above 90% for 10+ minutes."
+
+      - alert: OrbiHighMemory
+        expr: orbi_memory_utilization_pct > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Orbi router memory at {{ $value | printf \"%.0f\" }}%"
+          description: "Orbi RBR750 memory above 85% for 10+ minutes."
+
+      - alert: OrbiSatelliteDown
+        expr: orbi_satellite_up == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Orbi mesh satellite is unreachable"
+          description: "Orbi satellite has not responded for 3+ minutes. Mesh coverage may be degraded."
+
+      - alert: OrbiWANDown
+        expr: orbi_wan_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Internet connection is DOWN"
+          description: "Orbi WAN link has been down for 2+ minutes."
+
+      - alert: OrbiRouterDown
+        expr: orbi_up == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Orbi router is unreachable"
+          description: "Cannot reach Orbi RBR750 at 192.168.1.1 for 3+ minutes."
+
+  # ===========================================================================
+  # NFS mount health (detected via Telegraf disk_metrics)
+  # absent() alone never resolves; use unless/or pattern instead.
+  # ===========================================================================
+  - name: nfs_alerts
+    rules:
+      # Fires when the metric has existed before but disappears; resolves when it returns.
+      # The OR vector(0) == 1 arm is always false, keeping absent() resolvable:
+      #   - firing  = absent() returns 1, vector arm never fires
+      #   - resolved = metric returns, absent() returns no series → rule evaluates false
+      - alert: NFSMountMissing
+        expr: |
+          (absent(disk_usage_percent{mount="/Volumes/tv",source="nfs"})
+            or absent(disk_usage_percent{mount="/Volumes/movies",source="nfs"}))
+          unless (disk_usage_percent{mount="/Volumes/tv",source="nfs"} >= 0
+            and disk_usage_percent{mount="/Volumes/movies",source="nfs"} >= 0)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NFS mount missing — NAS may be unreachable"
+          description: "Core NFS mount (/Volumes/tv or /Volumes/movies) absent for 5+ minutes. Check mbuntu at 192.168.1.35."
+
+      - alert: NFSVolumeAlmostFull
+        expr: disk_usage_percent{source="nfs"} > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NFS volume {{ $labels.mount }} is {{ $value | printf \"%.0f\" }}% full"
+          description: "NAS volume {{ $labels.mount }} has exceeded 85% capacity."
+
+      - alert: NFSVolumeCriticallyFull
+        expr: disk_usage_percent{source="nfs"} > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: NFS volume {{ $labels.mount }} is {{ $value | printf \"%.0f\" }}% full"
+          description: "NAS volume {{ $labels.mount }} is nearly out of space."
+
+  # ===========================================================================
+  # Docker container health (via cAdvisor)
+  # ===========================================================================
+  - name: docker_alerts
+    rules:
+      - alert: ContainerHighDiskUsage
+        expr: (container_fs_usage_bytes{name!=""} / container_fs_limit_bytes{name!=""}) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} filesystem at {{ $value | printf \"%.0f\" }}%"
+          description: "Docker container {{ $labels.name }} overlay filesystem usage is high."
+
+      # rate() over 15m window → resolves as soon as restarts stop
+      - alert: ContainerRestartLoop
+        expr: rate(container_restart_count{name!=""}[15m]) * 900 > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarting repeatedly"
+          description: "Container {{ $labels.name }} has restarted >3 times in 15 minutes."
+
+      # 8 containers expected (alertmanager, cadvisor, grafana, loki,
+      #   node-exporter, prometheus, promtail, telegraf)
+      - alert: DockerContainerCountLow
+        expr: count(container_memory_usage_bytes{id=~"/docker/[0-9a-f]+"}) < 8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Docker container count dropped to {{ $value | printf \"%.0f\" }}"
+          description: "Expected 8 observability containers. Check docker ps on Mac Pro."
+
+  # ===========================================================================
+  # Ubuntu NAS — ZFS pool, disk SMART, and system health
+  # All via SSH → Telegraf inputs.file (nas_metrics.prom, 5m cadence)
+  # ===========================================================================
+  - name: nas_alerts
+    rules:
+      # NAS SSH connectivity
+      - alert: NASUnreachable
+        expr: nas_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ubuntu NAS (mbuntu) is unreachable"
+          description: "SSH to mbuntu at 192.168.1.35 has failed for 5+ minutes. NFS, ZFS, and SMART data unavailable."
+
+      # ZFS pool health (0 = DEGRADED/FAULTED, 1 = ONLINE)
+      - alert: ZFSPoolDegraded
+        expr: nas_zpool_health == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ZFS pool {{ $labels.pool }} is DEGRADED or FAULTED"
+          description: "ZFS pool {{ $labels.pool }} on mbuntu is not ONLINE. Run 'zpool status {{ $labels.pool }}' immediately."
+
+      # Per-vdev checksum errors — sdd currently shows 1 error
+      - alert: ZFSChecksumErrors
+        expr: nas_zpool_cksum_errors > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ZFS checksum errors on {{ $labels.pool }}/{{ $labels.vdev }}"
+          description: "{{ $value | printf \"%.0f\" }} checksum error(s) on vdev {{ $labels.vdev }} in pool {{ $labels.pool }}. May indicate disk {{ $labels.vdev }} is failing. Run 'zpool scrub'."
+
+      - alert: ZFSReadWriteErrors
+        expr: nas_zpool_read_errors > 0 or nas_zpool_write_errors > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ZFS read/write errors on {{ $labels.pool }}/{{ $labels.vdev }}"
+          description: "Read or write errors detected on vdev {{ $labels.vdev }} in pool {{ $labels.pool }}. Disk failure likely."
+
+      # ZFS pool capacity
+      - alert: ZFSPoolAlmostFull
+        expr: nas_zpool_capacity_pct > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ZFS pool {{ $labels.pool }} is {{ $value | printf \"%.0f\" }}% full"
+          description: "ZFS pools degrade above 80% — fragmentation increases. Free space on pool {{ $labels.pool }}."
+
+      - alert: ZFSPoolCriticallyFull
+        expr: nas_zpool_capacity_pct > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: ZFS pool {{ $labels.pool }} at {{ $value | printf \"%.0f\" }}%"
+          description: "ZFS pool {{ $labels.pool }} is critically full. Performance severely degraded above 90%."
+
+      # NAS SMART health (1=pass, 0=fail, -1=unknown)
+      - alert: NASSMARTFailure
+        expr: nas_smart_health == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SMART failure on NAS disk {{ $labels.disk }}"
+          description: "Drive {{ $labels.disk }} on mbuntu is reporting SMART health failure. Replace immediately."
+
+      # NAS disk temperatures — HDDs run hotter than SSDs; warn >55°C, critical >60°C
+      - alert: NASDriveTemperatureHigh
+        expr: nas_smart_temperature_celsius > 55
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NAS drive {{ $labels.disk }} temperature {{ $value | printf \"%.0f\" }}°C"
+          description: "NAS HDD {{ $labels.disk }} above 55°C for 15+ minutes. Check case airflow on mbuntu."
+
+      - alert: NASDriveTemperatureCritical
+        expr: nas_smart_temperature_celsius > 60
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: NAS drive {{ $labels.disk }} at {{ $value | printf \"%.0f\" }}°C"
+          description: "NAS HDD {{ $labels.disk }} above 60°C — exceeds safe HDD operating range. Risk of data loss."
+
+      # NAS system resources
+      - alert: NASHighMemory
+        expr: nas_memory_usage_pct > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NAS memory usage at {{ $value | printf \"%.0f\" }}%"
+          description: "mbuntu memory above 90% for 10+ minutes. ZFS ARC may be over-provisioned."
+
+      - alert: NASRootDiskFull
+        expr: nas_disk_root_usage_pct > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NAS root filesystem at {{ $value | printf \"%.0f\" }}%"
+          description: "mbuntu / (boot disk) is {{ $value | printf \"%.0f\" }}% full. Clean old kernels/logs."
