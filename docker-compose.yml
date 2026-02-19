@@ -2,7 +2,7 @@
 # Network Observability Stack — Hybrid PLG + Prometheus + Telegraf
 # Host: MacPro / 4tb-R1  |  Migrateable to Pi
 # Server target: 192.168.1.35
-# Last updated: 2026-02-18
+# Version: 1.1.0  |  Last updated: 2026-02-18
 # =============================================================================
 
 version: "3.8"
@@ -159,6 +159,7 @@ services:
     volumes:
       - /var/log:/var/log:ro
       - /Users/mProAdmin/Library/Logs/Plex Media Server:/plex-logs:ro  # corrected path 2026-02-18
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker Desktop socket for container log discovery
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
     command: -config.file=/etc/promtail/config.yml
     labels:

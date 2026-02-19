@@ -1,5 +1,5 @@
 {
-  "title": "Capes Homelab \u2014 Overview",
+  "title": "Capes Homelab — Overview",
   "uid": "capes-home",
   "tags": [
     "home",
@@ -12,7 +12,7 @@
   "panels": [
     {
       "type": "text",
-      "title": "\ud83c\udfe0 The Capes \u2014 Network Observability",
+      "title": "🏠 The Capes — Network Observability",
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -22,7 +22,7 @@
       "id": 1,
       "options": {
         "mode": "markdown",
-        "content": "# \ud83c\udfe0 The Capes Homelab \u2014 Mac Pro \u00b7 192.168.1.30\n\n**Stack:** Prometheus \u00b7 Grafana \u00b7 Loki \u00b7 Promtail \u00b7 Telegraf \u00b7 Alertmanager \u00b7 Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| \ud83d\udda5\ufe0f Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| \ud83d\udccb Log Browser | [Loki Logs](/d/liz0yRCZz/logs) |\n| \ud83d\udce1 Telegraf System | [Telegraf System](/d/000000074/telegraf-system-dashboard) |\n| \ud83c\udf10 Network / SNMP | [SNMP Stats](/d/000000050/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) \u00b7 [Alertmanager](http://localhost:9093) \u00b7 [Promtail](http://localhost:9080)"
+        "content": "# 🏠 The Capes Homelab — Mac Pro · 192.168.1.30\n\n**Stack:** Prometheus · Grafana · Loki · Promtail · Telegraf · Alertmanager · Node Exporter\n\n| Dashboard | Link |\n|---|---|\n| 🖥️ Mac Pro Host Metrics | [Node Exporter Full](/d/rYdddlPWk/node-exporter-full) |\n| 📋 Log Browser | [Loki Logs](/d/sadlil-loki-apps-dashboard/logs) |\n| 📡 Telegraf System | [Telegraf System](/d/telegraf-macpro-system/telegraf-system) |\n| 🌐 Network / SNMP | [SNMP Stats](/d/capes-network-snmp/snmp-stats) |\n\n**Quick links:** [Prometheus](http://localhost:9090) · [Alertmanager](http://localhost:9093) · [Promtail](http://localhost:9080)"
       }
     },
     {
@@ -353,19 +353,19 @@
               "type": "value",
               "options": {
                 "7": {
-                  "text": "7/7 ALL UP \u2705"
+                  "text": "7/7 ALL UP ✅"
                 },
                 "6": {
-                  "text": "6/7 \u26a0\ufe0f"
+                  "text": "6/7 ⚠️"
                 },
                 "5": {
-                  "text": "5/7 \u26a0\ufe0f"
+                  "text": "5/7 ⚠️"
                 },
                 "4": {
-                  "text": "4/7 \u274c"
+                  "text": "4/7 ❌"
                 },
                 "3": {
-                  "text": "3/7 \u274c"
+                  "text": "3/7 ❌"
                 }
               }
             }
@@ -399,7 +399,7 @@
     },
     {
       "type": "timeseries",
-      "title": "CPU Usage \u2014 Mac Pro (8-core Xeon E5 \u00b7 3GHz)",
+      "title": "CPU Usage — Mac Pro (8-core Xeon E5 · 3GHz)",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -441,7 +441,7 @@
     },
     {
       "type": "timeseries",
-      "title": "RAM Usage \u2014 64 GB",
+      "title": "RAM Usage — 64 GB",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -584,11 +584,11 @@
                     "type": "value",
                     "options": {
                       "1": {
-                        "text": "\ud83d\udfe2  UP",
+                        "text": "🟢  UP",
                         "color": "green"
                       },
                       "0": {
-                        "text": "\ud83d\udd34  DOWN",
+                        "text": "🔴  DOWN",
                         "color": "red"
                       }
                     }

@@ -1,5 +1,26 @@
 # CHANGELOG — NetworkObservability Stack
 
+## [1.1.0] — 2026-02-18
+
+### Added
+- **Promtail: Docker container log discovery** — added `docker_sd_configs` job using mounted Docker socket; auto-discovers all running containers and labels logs with `container`, `service`, `job=docker`, `host=macpro`
+- **Promtail: Docker socket mount** — added `/var/run/docker.sock` bind to `docker-compose.yml` for Promtail container log scraping
+- **Promtail: Plex log severity pipeline** — regex pipeline stage extracts `level` label (DEBUG/INFO/WARN/ERROR) from Plex log format
+- **Promtail: Recursive macOS log glob** — changed `/var/log/*.log` to `/var/log/**/*.log` to capture subdirectories (launchd, displaypolicy, etc.)
+- **Promtail: Section headers** — added descriptive comment blocks to all scrape_config jobs for readability
+- **host-metrics**: Updated `disk_metrics.prom` with current disk usage data
+- **Grafana dashboards**: Iterative updates to home.json, loki-logs.json, snmp-stats.json, telegraf-system.json
+- **grafana/dashboards/test-35.json**: Added experimental dashboard for 192.168.1.35 server monitoring
+
+### Changed
+- docker-compose.yml: Promtail now mounts `/var/run/docker.sock` to support Docker SD config
+
+### Notes
+- All 8 containers running healthy as of 2026-02-18 18:xx
+- Stack version bumped 1.0.0 → 1.1.0
+
+---
+
 ## [1.0.0] — 2026-02-18
 
 ### Added

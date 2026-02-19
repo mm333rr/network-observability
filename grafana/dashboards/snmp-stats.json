@@ -1,6 +1,6 @@
 {
   "uid": "capes-network-snmp",
-  "title": "\ud83c\udf10 Network & SNMP",
+  "title": "🌐 Network & SNMP",
   "description": "The Capes homelab network view: stack health, SNMP router stats (when reachable), Mac Pro interfaces (via Node Exporter VM layer), and Docker container networking (cAdvisor)",
   "tags": [
     "network",
@@ -12,12 +12,11 @@
   "timezone": "browser",
   "refresh": "30s",
   "schemaVersion": 38,
-  "version": 1,
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "\ud83d\udce1  Stack & Service Status",
+      "title": "📡  Stack & Service Status",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -72,15 +71,15 @@
               "type": "value",
               "options": {
                 "7": {
-                  "text": "7/7 \u2705",
+                  "text": "7/7 ✅",
                   "color": "green"
                 },
                 "6": {
-                  "text": "6/7 \u26a0\ufe0f",
+                  "text": "6/7 ⚠️",
                   "color": "yellow"
                 },
                 "5": {
-                  "text": "5/7 \u26a0\ufe0f",
+                  "text": "5/7 ⚠️",
                   "color": "orange"
                 }
               }
@@ -351,7 +350,7 @@
     {
       "id": 7,
       "type": "table",
-      "title": "Service Status \u2014 All Targets",
+      "title": "Service Status — All Targets",
       "description": "Live up/down for every Prometheus scrape target",
       "gridPos": {
         "h": 5,
@@ -424,11 +423,11 @@
                     "type": "value",
                     "options": {
                       "1": {
-                        "text": "\ud83d\udfe2  UP",
+                        "text": "🟢  UP",
                         "color": "green"
                       },
                       "0": {
-                        "text": "\ud83d\udd34  DOWN",
+                        "text": "🔴  DOWN",
                         "color": "red"
                       }
                     }
@@ -495,7 +494,7 @@
     {
       "id": 10,
       "type": "row",
-      "title": "\ud83c\udf10  SNMP / Router \u2014 192.168.1.1",
+      "title": "🌐  SNMP / Router — 192.168.1.1",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -517,7 +516,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### \u26a0\ufe0f  SNMP is not currently reachable\n\nTelegraf is configured to poll `192.168.1.1:161` via SNMP v2c (community: `public`) but all polls are timing out after 3 retries.\n\n**Possible causes:**\n- SNMP is disabled on the router \u2014 enable it in the router admin UI\n- Community string `public` is incorrect \u2014 check router SNMP settings\n- Router is blocking SNMP from Docker subnet `172.20.0.0/24` \u2014 add ACL exception\n- Router is at a different IP \u2014 update `telegraf.conf` agents list\n\n**To verify from Mac terminal:**\n```bash\nsnmpwalk -v2c -c public 192.168.1.1 1.3.6.1.2.1.1.1.0\n```\n\n**Once SNMP is working, this dashboard will automatically populate with:**\n- Router uptime\n- Per-interface TX/RX throughput (Mbps)\n- Interface error rates\n- Interface operational status\n- WAN interface identification\n"
+        "content": "### ⚠️  SNMP is not currently reachable\n\nTelegraf is configured to poll `192.168.1.1:161` via SNMP v2c (community: `public`) but all polls are timing out after 3 retries.\n\n**Possible causes:**\n- SNMP is disabled on the router — enable it in the router admin UI\n- Community string `public` is incorrect — check router SNMP settings\n- Router is blocking SNMP from Docker subnet `172.20.0.0/24` — add ACL exception\n- Router is at a different IP — update `telegraf.conf` agents list\n\n**To verify from Mac terminal:**\n```bash\nsnmpwalk -v2c -c public 192.168.1.1 1.3.6.1.2.1.1.1.0\n```\n\n**Once SNMP is working, this dashboard will automatically populate with:**\n- Router uptime\n- Per-interface TX/RX throughput (Mbps)\n- Interface error rates\n- Interface operational status\n- WAN interface identification\n"
       }
     },
     {
@@ -682,7 +681,7 @@
       "targets": [
         {
           "expr": "rate(interface_ifInOctets{host=\"macpro\"}[5m]) * 8",
-          "legendFormat": "\u2193 RX {{ifDescr}} (bps)",
+          "legendFormat": "↓ RX {{ifDescr}} (bps)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -691,7 +690,7 @@
         },
         {
           "expr": "rate(interface_ifOutOctets{host=\"macpro\"}[5m]) * 8",
-          "legendFormat": "\u2191 TX {{ifDescr}} (bps)",
+          "legendFormat": "↑ TX {{ifDescr}} (bps)",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -760,15 +759,15 @@
                     "type": "value",
                     "options": {
                       "1": {
-                        "text": "\ud83d\udfe2 UP",
+                        "text": "🟢 UP",
                         "color": "green"
                       },
                       "2": {
-                        "text": "\ud83d\udd34 DOWN",
+                        "text": "🔴 DOWN",
                         "color": "red"
                       },
                       "7": {
-                        "text": "\u26aa LOWER LAYER DOWN",
+                        "text": "⚪ LOWER LAYER DOWN",
                         "color": "orange"
                       }
                     }
@@ -935,7 +934,7 @@
     {
       "id": 20,
       "type": "row",
-      "title": "\ud83d\udda5\ufe0f  Mac Pro Network Interfaces",
+      "title": "🖥️  Mac Pro Network Interfaces",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -957,13 +956,13 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Node Exporter sees the Docker Linux VM's virtual interfaces (not macOS physical NICs). Real macOS interface throughput requires a host-side `nettop`/`netstat` LaunchAgent script feeding Telegraf \u2014 this is on the enrichment roadmap."
+        "content": "Node Exporter sees the Docker Linux VM's virtual interfaces (not macOS physical NICs). Real macOS interface throughput requires a host-side `nettop`/`netstat` LaunchAgent script feeding Telegraf — this is on the enrichment roadmap."
       }
     },
     {
       "id": 22,
       "type": "timeseries",
-      "title": "Node Exporter \u2014 Network RX (VM interfaces)",
+      "title": "Node Exporter — Network RX (VM interfaces)",
       "description": "These are the Docker Linux VM's virtual network interfaces, not macOS physical NICs",
       "gridPos": {
         "h": 8,
@@ -1006,7 +1005,7 @@
       "targets": [
         {
           "expr": "rate(node_network_receive_bytes_total{job=\"node-exporter-macpro\"}[5m])",
-          "legendFormat": "\u2193 {{device}}",
+          "legendFormat": "↓ {{device}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1018,7 +1017,7 @@
     {
       "id": 23,
       "type": "timeseries",
-      "title": "Node Exporter \u2014 Network TX (VM interfaces)",
+      "title": "Node Exporter — Network TX (VM interfaces)",
       "description": "",
       "gridPos": {
         "h": 8,
@@ -1061,7 +1060,7 @@
       "targets": [
         {
           "expr": "rate(node_network_transmit_bytes_total{job=\"node-exporter-macpro\"}[5m])",
-          "legendFormat": "\u2191 {{device}}",
+          "legendFormat": "↑ {{device}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1137,7 +1136,7 @@
     {
       "id": 30,
       "type": "row",
-      "title": "\ud83d\udc33  Docker Container Network (cAdvisor)",
+      "title": "🐳  Docker Container Network (cAdvisor)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1193,7 +1192,7 @@
       "targets": [
         {
           "expr": "rate(container_network_receive_bytes_total{name!=\"\"}[5m])",
-          "legendFormat": "\u2193 {{name}}",
+          "legendFormat": "↓ {{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -1248,7 +1247,7 @@
       "targets": [
         {
           "expr": "rate(container_network_transmit_bytes_total{name!=\"\"}[5m])",
-          "legendFormat": "\u2191 {{name}}",
+          "legendFormat": "↑ {{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

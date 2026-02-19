@@ -10,7 +10,9 @@ clients:
 
 scrape_configs:
 
-  # Tail macOS system logs
+  # -------------------------------------------------------------------------
+  # macOS system logs — includes subdirectories (launchd, displaypolicy, etc.)
+  # -------------------------------------------------------------------------
   - job_name: macos-system
     static_configs:
       - targets:
@@ -18,9 +20,11 @@ scrape_configs:
         labels:
           job: macos-system
           host: macpro
-          __path__: /var/log/*.log
+          __path__: /var/log/**/*.log
 
-  # Tail install logs
+  # -------------------------------------------------------------------------
+  # macOS install logs
+  # -------------------------------------------------------------------------
   - job_name: macos-install
     static_configs:
       - targets:
@@ -30,7 +34,10 @@ scrape_configs:
           host: macpro
           __path__: /var/log/install.log
 
-  # Plex Media Server logs
+  # -------------------------------------------------------------------------
+  # Plex Media Server logs — with severity extraction pipeline
+  # Format: "Feb 18, 2026 18:11:00.455 [0x...] DEBUG - ..."
+  # -------------------------------------------------------------------------
   - job_name: plex
     static_configs:
       - targets:
@@ -40,7 +47,15 @@ scrape_configs:
           host: macpro
           app: plex-media-server
           __path__: /plex-logs/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\w+ \d+, \d+ [\d:.]+\s+\[.*?\]\s+(?P<level>\w+)\s+-'
+      - labels:
+          level:
 
+  # -------------------------------------------------------------------------
+  # Plex plugin logs
+  # -------------------------------------------------------------------------
   - job_name: plex-plugins
     static_configs:
       - targets:
@@ -51,7 +66,28 @@ scrape_configs:
           app: plex-media-server
           __path__: /plex-logs/PMS Plugin Logs/*.log
 
+  # -------------------------------------------------------------------------
+  # Docker container logs — auto-discovers all running containers
+  # Uses Docker socket mounted from macOS Docker Desktop
+  # -------------------------------------------------------------------------
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      - target_label: 'job'
+        replacement: 'docker'
+      - target_label: 'host'
+        replacement: 'macpro'
+
+  # -------------------------------------------------------------------------
   # Syslog receiver — network devices push UDP syslog here
+  # -------------------------------------------------------------------------
   - job_name: syslog-network
     syslog:
       listen_address: 0.0.0.0:1514
