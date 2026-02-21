@@ -54,14 +54,23 @@ scrape_configs:
     static_configs:
       - targets: ['promtail:9080']
 
-  # mbuntu Ubuntu NAS — monitored via SSH exec (nas_metrics.sh → host-metrics/nas_metrics.prom)
-  # node-exporter is NOT installed on mbuntu; nas_up metric covers connectivity.
-  # To install: ssh mbuntu "sudo apt install -y prometheus-node-exporter"
-  #             then uncomment the scrape target below.
-  #
-  # - job_name: 'node-exporter-mbuntu'
-  #   static_configs:
-  #     - targets: ['192.168.1.35:9100']
-  #       labels:
-  #         host: 'mbuntu'
-  #         location: 'capes-ventura'
+  # mbuntu Ubuntu NAS/Docker host — node_exporter v1.8.2 systemd service
+  # Collectors: cpu, diskstats, filesystem, loadavg, meminfo, netdev, netstat,
+  #             stat, systemd, processes, zfs, hwmon, thermal_zone, vmstat, uname
+  # UFW: port 9100 open to 192.168.1.0/24
+  - job_name: 'node-exporter-mbuntu'
+    static_configs:
+      - targets: ['192.168.1.35:9100']
+        labels:
+          host: 'mbuntu'
+          location: 'capes-ventura'
+          role: 'nas-docker-host'
+  # AdGuard Home — DNS stats via adguard-exporter sidecar
+  # adguard-exporter is on the shared observability bridge network
+  - job_name: adguard
+    static_configs:
+      - targets: ['adguard-exporter:9617']
+        labels:
+          host: adguard
+          service: adguard-home
+

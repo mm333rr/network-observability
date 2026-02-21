@@ -1,5 +1,88 @@
 # CHANGELOG — NetworkObservability Stack
 
+## [3.0.0] — 2026-02-21
+
+### Portable Stack — Pi-Ready Refactor
+
+Goal: stack can be moved to any Linux/ARM host (Raspberry Pi) with zero config file edits —
+only `.env` and `~/.secrets/smtp.env` need updating on the new host.
+
+#### `.env` — all host-specific values extracted
+- Added `HOST_HOSTNAME` — label embedded in all metrics/logs (was hardcoded `macpro`)
+- Added `HOST_LAN_IP` — Grafana server domain + manage.sh URL display
+- Added `PLEX_HOST` / `PLEX_PORT` — Plex server IP (decoupled from stack host)
+- Added `SMTP_SECRETS_FILE` — absolute path to smtp.env (was hardcoded `/Users/mProAdmin/...`)
+
+#### `docker-compose.yml`
+- `alertmanager` `env_file:` now uses `${SMTP_SECRETS_FILE}` — no hardcoded Mac path
+- Grafana `GF_SERVER_DOMAIN` now uses `${HOST_LAN_IP:-192.168.1.30}`
+- Telegraf env block passes `PLEX_HOST` and `PLEX_PORT` to container
+
+#### `scripts/plex_metrics.sh`
+- Replaced `host.docker.internal:32400` with `${PLEX_HOST:-192.168.1.30}:${PLEX_PORT:-32400}`
+- `host.docker.internal` is macOS Docker Desktop only — breaks on Pi (Linux Docker)
+
+#### `scripts/smart_metrics.sh`
+- Rewrote disk enumeration: detects macOS vs Linux
+- macOS: `diskutil list` (APFS, external drives)
+- Linux: `lsblk -d` (sd*, nvme* block devices)
+- NVMe temperature fallback added
+
+#### `manage.sh`
+- Fixed long-standing `COMPPOSE` typo (was causing silent failures on restart/status/logs)
+- Fixed `STACK_DIR` assignment (was a literal string, not expanded)
+- Reads `HOST_LAN_IP` from `.env` for URL display in `start` output
+- DNS check updated from `.am180.us` to `.capes.local`
+
+#### `host-agent/` — new Linux cron equivalents
+- `write_disk_metrics_linux.sh` — replaces macOS LaunchAgent for disk usage
+- `write_net_metrics_linux.sh` — replaces macOS LaunchAgent for network counters (reads `/proc/net/dev`)
+- `write_smart_metrics_linux.sh` — SMART writer for cron (Linux block devices)
+- `README.md` — documents both-platform approach and migration steps
+
+#### `pi-setup.sh` — new Pi bootstrap script
+- Installs Docker, smartmontools
+- Installs cron jobs for all three host-agent metric writers
+- Creates `~/.secrets/smtp.env` placeholder
+- Sets correct data directory permissions (prometheus=65534, grafana=472)
+
+#### `AdGuardHome` stack — promoted to full DNS + DHCP
+- Switched to `network_mode: host` (required for DHCP broadcast)
+- DHCP enabled: range 192.168.1.50–200, gateway 192.168.1.1, DNS option 6 → 192.168.1.2
+- 15 static DHCP leases: all known Capes devices pinned to their IPs
+- DNS rewrites added: `*.capes.local` for all infrastructure + services
+  - `macpro.capes.local`, `mbuntu.capes.local`, `pi.capes.local` (reserved)
+  - `grafana/prometheus/alertmanager/loki/cadvisor.capes.local` → Mac Pro
+  - All *arr services → mbuntu
+- Retained all `*.am180.us` external rewrites
+- `adguard-exporter` now uses `192.168.1.2:3000` (host networking) instead of container hostname
+- Pi reservation noted in config (MAC TBD, IP 192.168.1.5 reserved)
+
+#### `prometheus.yml`
+- `adguard` scrape target fixed: `192.168.1.2:9617` (exporter on host network, not in observability bridge)
+- `adguard-exporter` container was in AdGuard compose, not this one — previous target `adguard-exporter:9617` was unreachable from this network
+
+## [2.3.0] — 2026-02-21
+
+### Changed — Alertmanager SMTP: Gmail → smtp2go
+
+**Security fix:** removed hardcoded Gmail app password from `alertmanager.yml`
+
+- `alertmanager.yml` — SMTP block now uses token placeholders; no credentials in file or git
+- `alertmanager/entrypoint.sh` — new startup script; `sed`-substitutes tokens from env vars at container start; resolved config written to `/tmp/alertmanager-resolved.yml`
+- `docker-compose.yml` — alertmanager now loads `env_file: ~/.secrets/smtp.env`; old inline `environment:` SMTP vars and `command:` block removed
+
+**smtp2go config:**
+- Host: `mail.smtp2go.com:587` STARTTLS
+- Account: `dockeralerts`
+- Verified sender: `alertmanager@am180.us`
+- Secrets: `~/.secrets/smtp.env` (Mac Pro) · `/srv/docker/secrets/smtp.env` (mbuntu)
+- Ref: `mm333rr/mbuntu-server-docs` → `credentials/smtp-reference.md`
+
+**Tested:** live email delivered to `matt@am180.us` ✅
+
+---
+
 ## [2.2.0] — 2026-02-19
 
 ### Added — Plex enrichment

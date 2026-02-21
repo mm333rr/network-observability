@@ -20,8 +20,11 @@
 #   plex_library_section        — 1 per library section (section, type, key labels)
 # =============================================================================
 
-PLEX_URL="http://host.docker.internal:32400"
-HOST="macpro"
+# PLEX_HOST and PLEX_PORT are injected by Telegraf exec environment block (from .env)
+# On Mac Pro: host.docker.internal resolves to the host -- but this is macOS-only.
+# Using explicit IP (default 192.168.1.30) works on both Mac and Pi.
+PLEX_URL="http://${PLEX_HOST:-192.168.1.30}:${PLEX_PORT:-32400}"
+HOST="${HOST_HOSTNAME:-macpro}"
 
 # ---------------------------------------------------------------------------
 # Helper: extract a JSON string value by key name (simple, single-line safe)

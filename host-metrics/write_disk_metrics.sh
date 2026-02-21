@@ -23,8 +23,12 @@ HOST="macpro"
   echo "# TYPE disk_used_bytes gauge"
   echo "# HELP disk_usage_percent Disk usage percentage (macOS host)"
   echo "# TYPE disk_usage_percent gauge"
+  echo "# HELP disk_source Filesystem source type: local or nfs (macOS host)"
+  echo "# TYPE disk_source gauge"
 
-  df -k | grep -E "^/dev/" | while IFS= read -r line; do
+  # Match local /dev/ devices AND NFS mounts (192.168.x.x:...)
+  # Use awk dedup to remove macOS automounter duplicate NFS mounts (same mountpoint)
+  df -k | grep -E "^(/dev/|[0-9]+\.)" | awk '!seen[$NF]++' | while IFS= read -r line; do
     fs=$(echo "$line" | awk '{print $1}')
     total_k=$(echo "$line" | awk '{print $2}')
     used_k=$(echo "$line" | awk '{print $3}')
@@ -37,6 +41,12 @@ HOST="macpro"
       /System/Volumes/VM|/System/Volumes/Preboot|/System/Volumes/Update|/Volumes/Docker) continue ;;
     esac
 
+    # Determine source type for labeling
+    source_type="local"
+    case "$fs" in
+      [0-9]*) source_type="nfs" ;;
+    esac
+
     label=$(echo "$mount" | sed 's|^/||; s|/|_|g; s| |_|g')
     [ -z "$label" ] && label="root"
 
@@ -44,10 +54,10 @@ HOST="macpro"
     total_bytes=$(( total_k * 1024 ))
     used_bytes=$(( used_k * 1024 ))
 
-    echo "disk_free_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\"} ${free_bytes}"
-    echo "disk_total_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\"} ${total_bytes}"
-    echo "disk_used_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\"} ${used_bytes}"
-    echo "disk_usage_percent{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\"} ${pct}"
+    echo "disk_free_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\",source=\"${source_type}\"} ${free_bytes}"
+    echo "disk_total_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\",source=\"${source_type}\"} ${total_bytes}"
+    echo "disk_used_bytes{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\",source=\"${source_type}\"} ${used_bytes}"
+    echo "disk_usage_percent{mount=\"${mount}\",volume=\"${label}\",host=\"${HOST}\",source=\"${source_type}\"} ${pct}"
   done
 } > "$TMPFILE"
 

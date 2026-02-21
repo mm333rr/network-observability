@@ -14,13 +14,10 @@
 
 global:
   resolve_timeout: 5m
-  # smtp2go relay — credentials injected via Docker env_file (no secrets in git)
-  # Secrets file: ~/.secrets/smtp.env (Mac Pro) | /srv/docker/secrets/smtp.env (mbuntu)
-  # Verified sender: alertmanager@am180.us (smtp2go Sending > Verified Senders)
-  smtp_smarthost: 'mail.smtp2go.com:587'
-  smtp_from: 'SMTP_FROM_PLACEHOLDER'
-  smtp_auth_username: 'SMTP_USER_PLACEHOLDER'
-  smtp_auth_password: 'SMTP_PASS_PLACEHOLDER'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'am180vta@gmail.com'
+  smtp_auth_username: 'am180vta@gmail.com'
+  smtp_auth_password: 'cvsb wnei uifb wrjc'
   smtp_require_tls: true
 
 route:

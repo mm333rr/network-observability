@@ -1,0 +1,26 @@
+#!/bin/bash
+# observability-start.sh
+# Waits for Docker Desktop to be fully ready, then starts the observability stack.
+# Called by com.capes.observability.plist on login.
+
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+
+STACK_DIR="/Volumes/4tb-R1/Docker Services/NetworkObservability"
+LOG="/tmp/observability-autostart.log"
+MAX_WAIT=120  # seconds to wait for Docker to be ready
+
+echo "[$(date)] observability-start: waiting for Docker..." >> "$LOG"
+
+elapsed=0
+while ! docker info &>/dev/null; do
+    sleep 5
+    elapsed=$((elapsed + 5))
+    if [ "$elapsed" -ge "$MAX_WAIT" ]; then
+        echo "[$(date)] ERROR: Docker not ready after ${MAX_WAIT}s, aborting." >> "$LOG"
+        exit 1
+    fi
+done
+
+echo "[$(date)] Docker ready after ${elapsed}s. Starting observability stack..." >> "$LOG"
+cd "$STACK_DIR" && docker compose up -d >> "$LOG" 2>&1
+echo "[$(date)] docker compose up -d exit code: $?" >> "$LOG"
