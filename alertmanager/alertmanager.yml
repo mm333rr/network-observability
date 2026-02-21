@@ -1,0 +1,132 @@
+# =============================================================================
+# alertmanager.yml — Capes Homelab NetworkObservability
+# Host: Mac Pro 192.168.1.30 | macOS 12.7.6
+#
+# Routing logic:
+#   critical → critical-alerts receiver (repeat every 1h)
+#   warning  → default-email receiver  (repeat every 4h)
+#   continue: false on critical route so warnings don't double-fire
+#
+# Inhibition:
+#   When a critical fires, suppress the corresponding warning for the same
+#   alert+instance+disk+mount combination to avoid duplicate emails.
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+  # smtp2go relay — credentials injected via Docker env_file (no secrets in git)
+  # Secrets file: ~/.secrets/smtp.env (Mac Pro) | /srv/docker/secrets/smtp.env (mbuntu)
+  # Verified sender: alertmanager@am180.us (smtp2go Sending > Verified Senders)
+  smtp_smarthost: 'mail.smtp2go.com:587'
+  smtp_from: 'SMTP_FROM_PLACEHOLDER'
+  smtp_auth_username: 'SMTP_USER_PLACEHOLDER'
+  smtp_auth_password: 'SMTP_PASS_PLACEHOLDER'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-email'
+  routes:
+    # Critical alerts: 1-hour repeat, do NOT continue to warning receiver
+    - matchers:
+        - severity="critical"
+      receiver: 'critical-alerts'
+      repeat_interval: 1h
+      continue: false
+
+    # Warning alerts: 4-hour repeat (inherits from root)
+    - matchers:
+        - severity="warning"
+      receiver: 'default-email'
+      repeat_interval: 4h
+      continue: false
+
+receivers:
+  - name: 'default-email'
+    email_configs:
+      - to: 'matt@am180.us'
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} — Capes Homelab'
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px">
+          <h2 style="color:{{ if eq .Status "firing" }}#e17055{{ else }}#00b894{{ end }}">
+            {{ .Status | toUpper }}: {{ .GroupLabels.alertname }}
+          </h2>
+          <p><b>Severity:</b> {{ .GroupLabels.severity | toUpper }}<br>
+          <b>Time:</b> {{ (index .Alerts 0).StartsAt.Format "2006-01-02 15:04 MST" }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <p><b>Summary:</b> {{ .Annotations.summary }}<br>
+          <b>Detail:</b> {{ .Annotations.description }}<br>
+          <b>Labels:</b> {{ range .Labels.SortedPairs }}<code>{{ .Name }}={{ .Value }}</code> {{ end }}</p>
+          {{ end }}
+          {{ if eq .Status "resolved" }}
+          <p style="color:#00b894"><b>✅ This alert has resolved.</b></p>
+          {{ end }}
+          <hr>
+          <p style="font-size:11px;color:#636e72">
+            Capes Homelab · Ventura CA ·
+            <a href="http://192.168.1.5:3000">Open Grafana</a>
+          </p>
+          </div>
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'matt@am180.us'
+        send_resolved: true
+        headers:
+          Subject: '🚨 [{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} — Capes Homelab'
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px;border-left:4px solid #d63031;padding-left:16px">
+          <h2 style="color:{{ if eq .Status "firing" }}#d63031{{ else }}#00b894{{ end }}">
+            {{ if eq .Status "firing" }}🚨 CRITICAL{{ else }}✅ RESOLVED{{ end }}: {{ .GroupLabels.alertname }}
+          </h2>
+          <p><b>Host:</b> Capes Homelab (Mac Pro 192.168.1.30 / NAS 192.168.1.35)<br>
+          <b>Time:</b> {{ (index .Alerts 0).StartsAt.Format "2006-01-02 15:04 MST" }}</p>
+          {{ range .Alerts }}
+          <p><b>Summary:</b> {{ .Annotations.summary }}<br>
+          <b>Detail:</b> {{ .Annotations.description }}<br>
+          <b>Labels:</b> {{ range .Labels.SortedPairs }}<code>{{ .Name }}={{ .Value }}</code> {{ end }}</p>
+          {{ end }}
+          {{ if eq .Status "resolved" }}
+          <p style="color:#00b894;font-weight:bold">✅ This critical alert has resolved.</p>
+          {{ end }}
+          <p><a href="http://192.168.1.5:3000">→ Open Grafana Dashboard</a></p>
+          </div>
+
+# =============================================================================
+# Inhibition: suppress the warning-tier alert when a critical fires for the
+# same condition. Uses a broad equal list; unmatched labels are ignored.
+# =============================================================================
+inhibit_rules:
+  # When a critical alert fires, silence the matching warning alert.
+  # e.g. VolumeCriticallyFull suppresses VolumeAlmostFull for same mount.
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    # alertname must share a base (handled by naming convention).
+    # instance/disk/mount/pool/vdev are optional — only applied when present.
+    equal: ['instance']
+
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ['disk']
+
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ['mount']
+
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ['pool', 'vdev']

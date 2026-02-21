@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: capes-mbuntu
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+rule_files:
+- alerts.yml
+scrape_configs:
+- job_name: node-exporter-mbuntu
+  static_configs:
+  - targets:
+    - 172.20.0.1:9100
+    labels:
+      host: mbuntu
+      location: capes-ventura
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - localhost:9090
+- job_name: alertmanager
+  static_configs:
+  - targets:
+    - alertmanager:9093
+- job_name: telegraf
+  static_configs:
+  - targets:
+    - telegraf:9273
+- job_name: cadvisor
+  static_configs:
+  - targets:
+    - cadvisor:8080
+    labels:
+      host: mbuntu
+- job_name: loki
+  static_configs:
+  - targets:
+    - loki:3100
+- job_name: promtail
+  static_configs:
+  - targets:
+    - promtail:9080
+- job_name: adguard
+  static_configs:
+  - targets:
+    - adguard-exporter:9617
+    labels:
+      host: adguard
+      service: adguard-home
