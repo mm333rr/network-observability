@@ -44,10 +44,3 @@ scrape_configs:
   static_configs:
   - targets:
     - promtail:9080
-- job_name: adguard
-  static_configs:
-  - targets:
-    - adguard-exporter:9617
-    labels:
-      host: adguard
-      service: adguard-home
