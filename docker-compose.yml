@@ -142,9 +142,18 @@ services:
     volumes:
     - /:/rootfs:ro
     - /var/run:/var/run:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
     - /sys:/sys:ro
     - /var/lib/docker:/var/lib/docker:ro
+    - /dev/disk:/dev/disk:ro
     privileged: true
+    devices:
+    - /dev/kmsg
+    command:
+    - --docker_only=true
+    - --store_container_labels=true
+    - --housekeeping_interval=30s
+    - --max_housekeeping_interval=35s
     labels:
     - stack=observability
   alertmanager:

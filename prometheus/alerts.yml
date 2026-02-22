@@ -228,19 +228,17 @@ groups:
       #   - resolved = metric returns, absent() returns no series → rule evaluates false
       - alert: NFSMountMissing
         expr: |
-          (absent(disk_usage_percent{mount="/Volumes/tv",source="nfs"})
-            or absent(disk_usage_percent{mount="/Volumes/movies",source="nfs"}))
-          unless (disk_usage_percent{mount="/Volumes/tv",source="nfs"} >= 0
-            and disk_usage_percent{mount="/Volumes/movies",source="nfs"} >= 0)
+          absent(node_filesystem_avail_bytes{host="mbuntu",mountpoint="/tank/tv"})
+          or absent(node_filesystem_avail_bytes{host="mbuntu",mountpoint="/tank/movies"})
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "NFS mount missing — NAS may be unreachable"
-          description: "Core NFS mount (/Volumes/tv or /Volumes/movies) absent for 5+ minutes. Check mbuntu at 192.168.1.35."
+          summary: "ZFS tank mount missing on mbuntu"
+          description: "ZFS dataset /tank/tv or /tank/movies is gone. NFS exports may be down."
 
       - alert: NFSVolumeAlmostFull
-        expr: disk_usage_percent{source="nfs"} > 85
+        expr: (1 - node_filesystem_avail_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"} / node_filesystem_size_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"}) * 100 > 85
         for: 5m
         labels:
           severity: warning
@@ -249,7 +247,7 @@ groups:
           description: "NAS volume {{ $labels.mount }} has exceeded 85% capacity."
 
       - alert: NFSVolumeCriticallyFull
-        expr: disk_usage_percent{source="nfs"} > 95
+        expr: (1 - node_filesystem_avail_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"} / node_filesystem_size_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"}) * 100 > 95
         for: 2m
         labels:
           severity: critical
@@ -405,14 +403,11 @@ groups:
           description: "mbuntu / (boot disk) is {{ $value | printf \"%.0f\" }}% full. Clean old kernels/logs."
 
       - alert: CriticalContainerDown
-        expr: >
-          absent(container_memory_usage_bytes{name="arr-sonarr"})
-          or absent(container_memory_usage_bytes{name="arr-radarr"})
-          or absent(container_memory_usage_bytes{name="vpn-torr-gluetun"})
-          or absent(container_memory_usage_bytes{name="arr-overseerr"})
+        expr: |
+          absent(container_memory_usage_bytes{job="cadvisor",id=~"/system.slice/docker-.+.scope"})
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "Critical container is down"
-          description: "A critical media stack container has been absent for 5+ minutes."
+          summary: "Docker containers absent from cAdvisor"
+          description: "No Docker container metrics from cAdvisor for 5+ minutes. Containers may be down or cAdvisor broken."
