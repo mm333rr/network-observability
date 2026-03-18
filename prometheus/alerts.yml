@@ -32,14 +32,69 @@ groups:
           summary: "Data volume nearly full: {{ $labels.mountpoint }}"
           description: "Volume {{ $labels.mountpoint }} has less than 10% free."
 
+      # Raised from 90% to 95%, extended from 10m to 20m.
+      # Mac Pro regularly hits 90%+ during Plex transcoding, ClaudeSort, DupeScan, etc.
       - alert: HighCPU
-        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained high CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 20+ minutes. Possible runaway process."
+
+      # NEW: load average — better freeze signal than CPU% on macOS.
+      # Mac Pro has 16 logical cores. load1 > 24 = 1.5x cores = noticeably sluggish.
+      # load1 > 40 = 2.5x cores = likely queued/frozen.
+      - alert: MacProHighLoad
+        expr: node_load1{host="macpro"} > 24
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "High CPU on {{ $labels.instance }}"
-          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 10+ minutes."
+          summary: "Mac Pro load average {{ $value | printf \"%.1f\" }} (>24 = 1.5x 16 cores)"
+          description: "1-minute load above 24 for 10+ minutes. Mac Pro is overloaded."
+
+      - alert: MacProCriticalLoad
+        expr: node_load1{host="macpro"} > 40
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Mac Pro load {{ $value | printf \"%.1f\" }} (>40 = 2.5x cores)"
+          description: "Mac Pro load above 40 for 5+ minutes. System may be frozen. Check Activity Monitor."
+
+      # NEW: swap-in rate — best macOS beachball/freeze predictor.
+      # Heavy page-in storms cause spinning beachball faster than any CPU% signal.
+      - alert: MacProSwapSurging
+        expr: rate(node_memory_swapped_in_bytes_total{host="macpro"}[5m]) / 1048576 > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mac Pro paging in {{ $value | printf \"%.0f\" }} MB/s — memory pressure"
+          description: "Mac Pro swap-in rate above 50 MB/s for 5+ minutes. Severe memory pressure; system may be unresponsive."
+
+      # NEW: macOS memory compressor — macOS-specific freeze precursor.
+      # node_memory_compressed_bytes already scraped. >2 GB = RAM exhausted.
+      # >4 GB = thrashing/freeze likely.
+      - alert: MacProMemoryPressure
+        expr: node_memory_compressed_bytes{host="macpro"} / 1073741824 > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mac Pro memory compressor at {{ $value | printf \"%.1f\" }} GB"
+          description: "macOS memory compressor above 2 GB for 10+ minutes. RAM exhausted; paging imminent."
+
+      - alert: MacProMemoryPressureCritical
+        expr: node_memory_compressed_bytes{host="macpro"} / 1073741824 > 4
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Mac Pro memory compressor {{ $value | printf \"%.1f\" }} GB — possible freeze"
+          description: "macOS memory compressor above 4 GB. System likely thrashing or frozen. Immediate intervention needed."
 
       - alert: HighMemoryUsage
         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
@@ -50,9 +105,6 @@ groups:
           summary: "High memory usage on {{ $labels.instance }}"
           description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
 
-  # ===========================================================================
-  # Mac Pro local disk / SMART (via Telegraf exec scripts)
-  # ===========================================================================
   - name: macpro_disk_alerts
     rules:
       - alert: VolumeAlmostFull
@@ -176,26 +228,29 @@ groups:
           summary: "Orbi router memory at {{ $value | printf \"%.0f\" }}%"
           description: "Orbi RBR750 memory above 85% for 10+ minutes."
 
-      # Satellite up/down: derived from active client count (no pingable IP available)
-      # orbi_satellite_up=1 when >=1 device is connected to satellite AP MAC,
-      # orbi_satellite_up=0 when satellite is absent from ConnAPMAC device list.
-      - alert: OrbiSatelliteDown
-        expr: orbi_satellite_up == 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Orbi satellite {{ $labels.satellite_mac }} has no connected clients"
-          description: "Satellite {{ $labels.satellite_node }} has had zero connected devices for 5+ minutes. It may have dropped from the mesh. Check mesh status at http://192.168.1.1."
+      # Satellite up/down: derived from active client count (no pingable IP available).
+      # NOTE: RBR750 firmware V7.2.x+ returns 401 on GetAttachDevice2 SOAP calls
+      # (confirmed 2026-02-22) — orbi_satellite_up is permanently 0 and cannot be
+      # trusted as a satellite health signal. Alert suppressed until SOAP auth is
+      # restored or an alternative detection method is implemented.
+      # TODO: re-enable when SOAP auth issue is resolved or satellite ping is available.
+      # - alert: OrbiSatelliteDown
+      #   expr: orbi_satellite_up == 0
+      #   for: 5m
 
       - alert: OrbiWANDown
-        expr: orbi_wan_up == 0
+        # NOTE: WANIPConnection:1 SOAP service returns 401 on RBR750 firmware V7.2.x+
+        # (confirmed 2026-02-22). orbi_wan_up is permanently 0 and cannot be trusted.
+        # Replaced with ping-based internet check: if Cloudflare 1.1.1.1 AND Google 8.8.8.8
+        # are both unreachable (RTT = -1), internet is actually down.
+        # Both must fail to avoid false positives from transient single-target drops.
+        expr: orbi_ping_rtt_ms{target="cloudflare"} == -1 and orbi_ping_rtt_ms{target="google"} == -1
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Internet connection is DOWN"
-          description: "Orbi WAN link has been down for 2+ minutes."
+          summary: "Internet connection is DOWN (both Cloudflare and Google unreachable)"
+          description: "Ping to both 1.1.1.1 and 8.8.8.8 has been -1 (failed) for 2+ minutes. Internet is likely down."
 
       - alert: OrbiRouterDown
         expr: orbi_up == 0
@@ -403,11 +458,16 @@ groups:
           description: "mbuntu / (boot disk) is {{ $value | printf \"%.0f\" }}% full. Clean old kernels/logs."
 
       - alert: CriticalContainerDown
+        # UPDATED 2026-02-22: cAdvisor v0.49.1 required for cgroupv2 per-container metrics.
+        # Previously used absent(container_last_seen{name!=""}) but cAdvisor on cgroupv2
+        # only emits root cgroup until v0.49+. Now alerts when cAdvisor scrape target down.
+        # Per-container alerts (ContainerHighDiskUsage, ContainerRestartLoop) will work
+        # correctly once cAdvisor v0.49.1 is running and cgroupv2 per-container metrics flow.
         expr: |
-          absent(container_memory_usage_bytes{job="cadvisor",id=~"/system.slice/docker-.+.scope"})
+          up{job="cadvisor"} == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "Docker containers absent from cAdvisor"
-          description: "No Docker container metrics from cAdvisor for 5+ minutes. Containers may be down or cAdvisor broken."
+          summary: "cAdvisor is DOWN -- no Docker container metrics"
+          description: "cAdvisor scrape target is unreachable for 5+ minutes. Docker container monitoring is offline."
