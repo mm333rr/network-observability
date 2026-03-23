@@ -471,3 +471,72 @@ groups:
         annotations:
           summary: "cAdvisor is DOWN -- no Docker container metrics"
           description: "cAdvisor scrape target is unreachable for 5+ minutes. Docker container monitoring is offline."
+
+  # ===========================================================================
+  # AdGuard Home DNS health and stats (via adguard-exporter on port 9618)
+  # ===========================================================================
+  - name: adguard_dns
+    rules:
+      - alert: AdGuardDown
+        expr: up{job="adguard-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard Home exporter is DOWN"
+          description: "adguard-exporter cannot reach AdGuard Home. DNS filtering may be offline."
+
+      - alert: AdGuardProtectionDisabled
+        expr: adguard_protection_enabled == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard protection is DISABLED"
+          description: "AdGuard Home DNS filtering has been turned off. All ads/trackers are unblocked."
+
+      - alert: AdGuardNotRunning
+        expr: adguard_running == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard Home is NOT running"
+          description: "AdGuard Home process has stopped. DNS resolution for the network may be degraded."
+
+      - alert: DNSQueryRateDrop
+        expr: rate(adguard_dns_queries_total[5m]) * 60 < 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS query rate near zero (less than 1/min for 5m)"
+          description: "AdGuard is receiving almost no DNS queries. Devices may have lost connectivity to 192.168.1.2."
+
+      - alert: DNSBlockRateSurge
+        expr: >
+          (rate(adguard_blocked_filtering_total[10m]) / rate(adguard_dns_queries_total[10m])) * 100 > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS block rate above 60% -- possible over-blocking"
+          description: "More than 60% of DNS queries are being blocked. A new filter list may be breaking services. Check AdGuard logs."
+
+      - alert: DNSHighLatency
+        expr: adguard_avg_processing_time_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS avg processing time above 100ms"
+          description: "AdGuard Home average DNS resolution time above 100ms for 5+ minutes. Upstream DNS may be slow."
+
+      - alert: DNSCriticalLatency
+        expr: adguard_avg_processing_time_seconds > 0.5
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL DNS latency above 500ms average"
+          description: "AdGuard DNS resolution averaging above 500ms. Network or upstream DNS severely degraded."

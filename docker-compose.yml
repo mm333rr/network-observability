@@ -132,6 +132,10 @@ services:
     labels:
     - stack=observability
   cadvisor:
+    # v0.47.2: last version whose go-dockerclient works with Docker API <=1.44.
+    # v0.49.x hardcodes client API 1.41 and Docker 29 rejects it (needs >=1.44).
+    # cgroupv2 + systemd driver fix: mount /sys/fs/cgroup rw, add --raw_cgroup_prefix_whitelist
+    # Updated 2026-02-22
     image: gcr.io/cadvisor/cadvisor:v0.47.2
     container_name: cadvisor
     restart: unless-stopped
@@ -144,6 +148,7 @@ services:
     - /var/run:/var/run:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     - /sys:/sys:ro
+    - /sys/fs/cgroup:/sys/fs/cgroup:rw
     - /var/lib/docker:/var/lib/docker:ro
     - /dev/disk:/dev/disk:ro
     privileged: true
@@ -154,6 +159,7 @@ services:
     - --store_container_labels=true
     - --housekeeping_interval=30s
     - --max_housekeeping_interval=35s
+    - --raw_cgroup_prefix_whitelist=/system.slice/docker
     labels:
     - stack=observability
   alertmanager:
@@ -175,5 +181,21 @@ services:
     entrypoint:
     - /bin/sh
     - /entrypoint.sh
+    labels:
+    - stack=observability
+
+  adguard-exporter:
+    image: ghcr.io/henrywhitaker3/adguard-exporter:latest
+    container_name: adguard-exporter
+    restart: unless-stopped
+    networks:
+    - observability
+    ports:
+    - 192.168.1.5:9618:9618
+    environment:
+    - ADGUARD_SERVERS=http://192.168.1.2:3000
+    - ADGUARD_USERNAMES=admin
+    - ADGUARD_PASSWORDS=${ADGUARD_PASS}
+    - INTERVAL=15s
     labels:
     - stack=observability
