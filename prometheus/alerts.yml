@@ -34,27 +34,6 @@ groups:
 
       # Raised from 90% to 95%, extended from 10m to 20m.
       # Mac Pro regularly hits 90%+ during Plex transcoding, ClaudeSort, DupeScan, etc.
-      - alert: HighCPU
-        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
-        for: 20m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Sustained high CPU on {{ $labels.instance }}"
-          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 20+ minutes. Possible runaway process."
-
-      # NEW: load average — better freeze signal than CPU% on macOS.
-      # Mac Pro has 16 logical cores. load1 > 24 = 1.5x cores = noticeably sluggish.
-      # load1 > 40 = 2.5x cores = likely queued/frozen.
-      - alert: MacProHighLoad
-        expr: node_load1{host="macpro"} > 24
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Mac Pro load average {{ $value | printf \"%.1f\" }} (>24 = 1.5x 16 cores)"
-          description: "1-minute load above 24 for 10+ minutes. Mac Pro is overloaded."
-
       - alert: MacProCriticalLoad
         expr: node_load1{host="macpro"} > 40
         for: 5m
@@ -78,15 +57,6 @@ groups:
       # NEW: macOS memory compressor — macOS-specific freeze precursor.
       # node_memory_compressed_bytes already scraped. >2 GB = RAM exhausted.
       # >4 GB = thrashing/freeze likely.
-      - alert: MacProMemoryPressure
-        expr: node_memory_compressed_bytes{host="macpro"} / 1073741824 > 2
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Mac Pro memory compressor at {{ $value | printf \"%.1f\" }} GB"
-          description: "macOS memory compressor above 2 GB for 10+ minutes. RAM exhausted; paging imminent."
-
       - alert: MacProMemoryPressureCritical
         expr: node_memory_compressed_bytes{host="macpro"} / 1073741824 > 4
         for: 5m
@@ -96,17 +66,6 @@ groups:
           summary: "CRITICAL: Mac Pro memory compressor {{ $value | printf \"%.1f\" }} GB — possible freeze"
           description: "macOS memory compressor above 4 GB. System likely thrashing or frozen. Immediate intervention needed."
 
-      - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High memory usage on {{ $labels.instance }}"
-          description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
-
-  - name: macpro_disk_alerts
-    rules:
       - alert: VolumeAlmostFull
         expr: disk_usage_percent > 90
         for: 5m
