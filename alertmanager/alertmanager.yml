@@ -27,7 +27,7 @@ route:
   group_by: ['alertname', 'severity']
   group_wait: 30s
   group_interval: 5m
-  repeat_interval: 4h
+  repeat_interval: 12h
   receiver: 'default-email'
   routes:
     # Critical alerts: 1-hour repeat, do NOT continue to warning receiver
@@ -37,11 +37,13 @@ route:
       repeat_interval: 1h
       continue: false
 
-    # Warning alerts: 4-hour repeat (inherits from root)
+    # Warning alerts: 12-hour repeat — warnings are informational, not urgent.
+    # If something is still firing 12h later and hasn't resolved, that's worth
+    # a nudge. But a lingering disk-usage warning shouldn't fill your inbox.
     - matchers:
         - severity="warning"
       receiver: 'default-email'
-      repeat_interval: 4h
+      repeat_interval: 12h
       continue: false
 
 receivers:

@@ -35,24 +35,23 @@ groups:
       # Raised from 90% to 95%, extended from 10m to 20m.
       # Mac Pro regularly hits 90%+ during Plex transcoding, ClaudeSort, DupeScan, etc.
       - alert: MacProCriticalLoad
-        expr: node_load1{host="macpro"} > 40
-        for: 5m
+        # Raised for: 5m → 15m and threshold 40 → 48 (3x 16 cores).
+        # load>40 fired repeatedly overnight during heavy but normal workloads
+        # (Plex batch optimizer, ClaudeSort, etc.). 48 = 3x cores sustained for
+        # 15min is a genuine jam/freeze, not just a heavy job. If it's truly
+        # frozen you won't be fixing it in under 15 minutes anyway.
+        expr: node_load1{host="macpro"} > 48
+        for: 15m
         labels:
           severity: critical
         annotations:
-          summary: "CRITICAL: Mac Pro load {{ $value | printf \"%.1f\" }} (>40 = 2.5x cores)"
-          description: "Mac Pro load above 40 for 5+ minutes. System may be frozen. Check Activity Monitor."
+          summary: "CRITICAL: Mac Pro load {{ $value | printf \"%.1f\" }} (>48 = 3x 16 cores)"
+          description: "Mac Pro load above 48 for 15+ minutes. System likely frozen or severely jammed. Check Activity Monitor immediately."
 
-      # NEW: swap-in rate — best macOS beachball/freeze predictor.
-      # Heavy page-in storms cause spinning beachball faster than any CPU% signal.
-      - alert: MacProSwapSurging
-        expr: rate(node_memory_swapped_in_bytes_total{host="macpro"}[5m]) / 1048576 > 50
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Mac Pro paging in {{ $value | printf \"%.0f\" }} MB/s — memory pressure"
-          description: "Mac Pro swap-in rate above 50 MB/s for 5+ minutes. Severe memory pressure; system may be unresponsive."
+      # MacProSwapSurging REMOVED: fired for brief 5-min windows during normal
+      # heavy workloads (ClaudeSort, DupeScan). Not actionable — swap bursts
+      # during batch jobs are expected on macOS. MacProMemoryPressureCritical
+      # (compressor >4GB for 5m) is the correct freeze-precursor signal.
 
       # NEW: macOS memory compressor — macOS-specific freeze precursor.
       # node_memory_compressed_bytes already scraped. >2 GB = RAM exhausted.
@@ -142,13 +141,18 @@ groups:
   - name: infrastructure_alerts
     rules:
       - alert: InstanceDown
+        # 10m window: filters launchd/docker restarts that recover within a minute or two.
+        # plex-health-monitor was crashing on Plex float speed values and restarting
+        # every ~60s → critical+resolved email pairs all night. Root cause fixed in
+        # plex_health_monitor.py (int(float()) cast + per-item try/except). Keeping
+        # 10m here as belt-and-suspenders against any future flapping process.
         expr: up == 0
-        for: 2m
+        for: 10m
         labels:
           severity: critical
         annotations:
           summary: "Instance {{ $labels.instance }} is DOWN"
-          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 2+ minutes."
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 10+ minutes. Action required."
 
       - alert: NetworkErrors
         expr: rate(node_network_transmit_errs_total[5m]) > 10
