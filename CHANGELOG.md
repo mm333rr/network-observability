@@ -66,3 +66,28 @@ discovered during that session that this monitoring would have caught immediatel
 
 ### Added
 - Initial stack: Prometheus, Grafana, Loki, Promtail, Alertmanager, Telegraf, cAdvisor
+
+---
+
+## [2.1.0] - 2026-04-01
+
+### Fixed
+- **Alertmanager silent SMTP failure (v0.26.0 → v0.27.0)**
+  - Root cause: CA certificate bundle in prom/alertmanager:v0.26.0 (dated Aug 2023)
+    caused Go TLS client to hang indefinitely on smtp2go STARTTLS handshake.
+    Notifications silently dropped — no error logged, no retry, nflog never written.
+  - Symptom: FIRING emails sent (from pre-March-26 container state); RESOLVED emails
+    never delivered. Zero notify.go log lines after March 26 restart.
+  - Fix: upgraded to prom/alertmanager:v0.27.0 (Go 1.21.7 + updated CA roots).
+    Full round-trip verified: firing + resolved both delivered in same session.
+  - Added --log.level=debug permanently to entrypoint.sh.
+  - Commit: b565e1d
+
+### Fixed
+- **AdGuard duplicate DHCP lease → adguard-exporter HTTP 500**
+  - IP 192.168.1.64 (MAC 5c:ad:ba:4b:90:a0) duplicated in AdGuard lease table.
+  - adguard-exporter emitted duplicate Prometheus labels → 500 on every scrape.
+  - AdGuardDown + InstanceDown fired ~22:30 UTC March 31 for ~6 hours.
+  - Fix: removed duplicate via POST /control/dhcp/remove_static_lease.
+  - AdGuard Home DNS/DHCP remained operational throughout.
+  - All 10 Prometheus targets confirmed UP post-fix.
