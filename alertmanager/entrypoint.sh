@@ -2,6 +2,7 @@
 # entrypoint.sh — substitute SMTP secrets into alertmanager config at container start
 # Reads SMTP_USERNAME and SMTP_PASSWORD from env (injected via env_file in compose)
 # Never stores credentials in the config file or git
+# v2 — added --log.level=debug for persistent notification dispatch visibility
 
 set -e
 
@@ -17,4 +18,5 @@ sed \
 exec /bin/alertmanager \
   --config.file="$CONFIG_OUT" \
   --storage.path=/alertmanager \
+  --log.level=debug \
   "$@"
