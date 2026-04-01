@@ -503,3 +503,35 @@ groups:
         annotations:
           summary: "CRITICAL DNS latency above 500ms average"
           description: "AdGuard DNS resolution averaging above 500ms. Network or upstream DNS severely degraded."
+
+  # ── Reboot / Shutdown Detection ─────────────────────────────────────────────
+  - name: reboot_detection
+    rules:
+
+      # Fires when node_boot_time_seconds changes — i.e. a machine rebooted.
+      # changes() over 10m: if boot time increases, a reboot occurred.
+      # Creates a visible firing event on Grafana dashboards for every reboot.
+      - alert: NodeRebooted
+        expr: changes(node_boot_time_seconds[10m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          service: system
+        annotations:
+          summary: "{{ $labels.instance }} rebooted"
+          description: >
+            Node {{ $labels.instance }} has rebooted. Boot time changed within
+            the last 10 minutes. Check reboot-notify email for pre/post metrics.
+
+      # Catches nodes that came back online recently (reboot or cold start).
+      - alert: NodeRecentBoot
+        expr: (time() - node_boot_time_seconds) < 600
+        for: 0m
+        labels:
+          severity: info
+          service: system
+        annotations:
+          summary: "{{ $labels.instance }} came back online (up < 10m)"
+          description: >
+            Node {{ $labels.instance }} has been up less than 10 minutes.
+            Verify all services resumed normally after reboot.
