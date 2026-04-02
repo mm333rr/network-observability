@@ -32,29 +32,61 @@ groups:
           summary: "Data volume nearly full: {{ $labels.mountpoint }}"
           description: "Volume {{ $labels.mountpoint }} has less than 10% free."
 
-      - alert: HighCPU
-        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
-        for: 10m
+      # Raised from 90% to 95%, extended from 10m to 20m.
+      # Mac Pro regularly hits 90%+ during Plex transcoding, ClaudeSort, DupeScan, etc.
+      - alert: MacProCriticalLoad
+        # Raised for: 5m → 15m and threshold 40 → 48 (3x 16 cores).
+        # load>40 fired repeatedly overnight during heavy but normal workloads
+        # (Plex batch optimizer, ClaudeSort, etc.). 48 = 3x cores sustained for
+        # 15min is a genuine jam/freeze, not just a heavy job. If it's truly
+        # frozen you won't be fixing it in under 15 minutes anyway.
+        expr: node_load1{host="macpro"} > 48
+        for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          summary: "High CPU on {{ $labels.instance }}"
-          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for 10+ minutes."
+          summary: "CRITICAL: Mac Pro load {{ $value | printf \"%.1f\" }} (>48 = 3x 16 cores)"
+          description: "Mac Pro load above 48 for 15+ minutes. System likely frozen or severely jammed. Check Activity Monitor immediately."
 
-      - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+      # MacProSwapSurging REMOVED: fired for brief 5-min windows during normal
+      # heavy workloads (ClaudeSort, DupeScan). Not actionable — swap bursts
+      # during batch jobs are expected on macOS. MacProMemoryPressureCritical
+      # (compressor >4GB for 5m) is the correct freeze-precursor signal.
+
+      # NEW: macOS memory compressor — macOS-specific freeze precursor.
+      # node_memory_compressed_bytes already scraped. >2 GB = RAM exhausted.
+      # >4 GB = thrashing/freeze likely.
+      - alert: MacProMemoryPressureCritical
+        expr: node_memory_compressed_bytes{host="macpro"} / 1073741824 > 4
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Mac Pro memory compressor {{ $value | printf \"%.1f\" }} GB — possible freeze"
+          description: "macOS memory compressor above 4 GB. System likely thrashing or frozen. Immediate intervention needed."
+
+      # Mac Pro sustained high CPU — secondary processes (ffmpeg) crowding out Plex/WindowServer
+      # node_cpu_usage is 0-100% of total (all 16 cores). >90% for 5m = system saturated.
+      - alert: MacProHighCPUSustained
+        expr: 100 - (avg by(host)(rate(node_cpu_seconds_total{mode="idle",host="macpro"}[5m])) * 100) > 90
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "High memory usage on {{ $labels.instance }}"
-          description: "Memory is {{ $value | printf \"%.1f\" }}% utilized."
+          summary: "WARNING: Mac Pro CPU {{ $value | humanize }}% for 5+ min"
+          description: "Mac Pro CPU above 90% sustained. Likely batch encode (ffmpeg) crowding Plex/WindowServer. plex-guardian should be throttling — check ~/Library/Logs/plex-guardian.log."
 
-  # ===========================================================================
-  # Mac Pro local disk / SMART (via Telegraf exec scripts)
-  # ===========================================================================
-  - name: macpro_disk_alerts
-    rules:
+      # Mac Pro CPU saturation at critical level — WindowServer watchdog panic risk
+      # >95% for 3m is the pre-panic danger zone identified from Apr 1 2026 incident
+      - alert: MacProCPUPanicRisk
+        expr: 100 - (avg by(host)(rate(node_cpu_seconds_total{mode="idle",host="macpro"}[2m])) * 100) > 95
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Mac Pro CPU {{ $value | humanize }}% — WindowServer panic risk"
+          description: "Mac Pro CPU above 95% for 3+ minutes. WindowServer watchdog kernel panic risk. plex-guardian should have intervened. Verify guardian is running and check ffmpeg nice levels immediately."
+
       - alert: VolumeAlmostFull
         expr: disk_usage_percent > 90
         for: 5m
@@ -83,7 +115,7 @@ groups:
           description: "Drive {{ $labels.disk }} is reporting SMART health failure."
 
       - alert: DriveTemperatureHigh
-        expr: smart_temperature_celsius > 65
+        expr: smart_temperature_celsius{host!="mbuntu"} > 65
         for: 10m
         labels:
           severity: warning
@@ -92,7 +124,7 @@ groups:
           description: "Drive {{ $labels.disk }} temperature exceeds 65°C for 10+ minutes."
 
       - alert: DriveTemperatureCritical
-        expr: smart_temperature_celsius > 70
+        expr: smart_temperature_celsius{host!="mbuntu"} > 70
         for: 5m
         labels:
           severity: critical
@@ -131,13 +163,18 @@ groups:
   - name: infrastructure_alerts
     rules:
       - alert: InstanceDown
+        # 10m window: filters launchd/docker restarts that recover within a minute or two.
+        # plex-health-monitor was crashing on Plex float speed values and restarting
+        # every ~60s → critical+resolved email pairs all night. Root cause fixed in
+        # plex_health_monitor.py (int(float()) cast + per-item try/except). Keeping
+        # 10m here as belt-and-suspenders against any future flapping process.
         expr: up == 0
-        for: 2m
+        for: 10m
         labels:
           severity: critical
         annotations:
           summary: "Instance {{ $labels.instance }} is DOWN"
-          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 2+ minutes."
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 10+ minutes. Action required."
 
       - alert: NetworkErrors
         expr: rate(node_network_transmit_errs_total[5m]) > 10
@@ -176,26 +213,29 @@ groups:
           summary: "Orbi router memory at {{ $value | printf \"%.0f\" }}%"
           description: "Orbi RBR750 memory above 85% for 10+ minutes."
 
-      # Satellite up/down: derived from active client count (no pingable IP available)
-      # orbi_satellite_up=1 when >=1 device is connected to satellite AP MAC,
-      # orbi_satellite_up=0 when satellite is absent from ConnAPMAC device list.
-      - alert: OrbiSatelliteDown
-        expr: orbi_satellite_up == 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Orbi satellite {{ $labels.satellite_mac }} has no connected clients"
-          description: "Satellite {{ $labels.satellite_node }} has had zero connected devices for 5+ minutes. It may have dropped from the mesh. Check mesh status at http://192.168.1.1."
+      # Satellite up/down: derived from active client count (no pingable IP available).
+      # NOTE: RBR750 firmware V7.2.x+ returns 401 on GetAttachDevice2 SOAP calls
+      # (confirmed 2026-02-22) — orbi_satellite_up is permanently 0 and cannot be
+      # trusted as a satellite health signal. Alert suppressed until SOAP auth is
+      # restored or an alternative detection method is implemented.
+      # TODO: re-enable when SOAP auth issue is resolved or satellite ping is available.
+      # - alert: OrbiSatelliteDown
+      #   expr: orbi_satellite_up == 0
+      #   for: 5m
 
       - alert: OrbiWANDown
-        expr: orbi_wan_up == 0
+        # NOTE: WANIPConnection:1 SOAP service returns 401 on RBR750 firmware V7.2.x+
+        # (confirmed 2026-02-22). orbi_wan_up is permanently 0 and cannot be trusted.
+        # Replaced with ping-based internet check: if Cloudflare 1.1.1.1 AND Google 8.8.8.8
+        # are both unreachable (RTT = -1), internet is actually down.
+        # Both must fail to avoid false positives from transient single-target drops.
+        expr: orbi_ping_rtt_ms{target="cloudflare"} == -1 and orbi_ping_rtt_ms{target="google"} == -1
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Internet connection is DOWN"
-          description: "Orbi WAN link has been down for 2+ minutes."
+          summary: "Internet connection is DOWN (both Cloudflare and Google unreachable)"
+          description: "Ping to both 1.1.1.1 and 8.8.8.8 has been -1 (failed) for 2+ minutes. Internet is likely down."
 
       - alert: OrbiRouterDown
         expr: orbi_up == 0
@@ -228,19 +268,17 @@ groups:
       #   - resolved = metric returns, absent() returns no series → rule evaluates false
       - alert: NFSMountMissing
         expr: |
-          (absent(disk_usage_percent{mount="/Volumes/tv",source="nfs"})
-            or absent(disk_usage_percent{mount="/Volumes/movies",source="nfs"}))
-          unless (disk_usage_percent{mount="/Volumes/tv",source="nfs"} >= 0
-            and disk_usage_percent{mount="/Volumes/movies",source="nfs"} >= 0)
+          absent(node_filesystem_avail_bytes{host="mbuntu",mountpoint="/tank/tv"})
+          or absent(node_filesystem_avail_bytes{host="mbuntu",mountpoint="/tank/movies"})
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "NFS mount missing — NAS may be unreachable"
-          description: "Core NFS mount (/Volumes/tv or /Volumes/movies) absent for 5+ minutes. Check mbuntu at 192.168.1.35."
+          summary: "ZFS tank mount missing on mbuntu"
+          description: "ZFS dataset /tank/tv or /tank/movies is gone. NFS exports may be down."
 
       - alert: NFSVolumeAlmostFull
-        expr: disk_usage_percent{source="nfs"} > 85
+        expr: (1 - node_filesystem_avail_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"} / node_filesystem_size_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"}) * 100 > 85
         for: 5m
         labels:
           severity: warning
@@ -249,7 +287,7 @@ groups:
           description: "NAS volume {{ $labels.mount }} has exceeded 85% capacity."
 
       - alert: NFSVolumeCriticallyFull
-        expr: disk_usage_percent{source="nfs"} > 95
+        expr: (1 - node_filesystem_avail_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"} / node_filesystem_size_bytes{host="mbuntu",fstype="zfs",mountpoint=~"/tank/.+"}) * 100 > 95
         for: 2m
         labels:
           severity: critical
@@ -284,7 +322,7 @@ groups:
       # 8 containers expected (alertmanager, cadvisor, grafana, loki,
       #   node-exporter, prometheus, promtail, telegraf)
       - alert: DockerContainerCountLow
-        expr: count(container_memory_usage_bytes{id=~"/docker/[0-9a-f]+"}) < 8
+        expr: count(container_memory_usage_bytes{id=~"/docker/[0-9a-f]+"}) < 20
         for: 5m
         labels:
           severity: warning
@@ -358,7 +396,7 @@ groups:
 
       # NAS SMART health (1=pass, 0=fail, -1=unknown)
       - alert: NASSMARTFailure
-        expr: nas_smart_health == 0
+        expr: smart_health == 0
         for: 2m
         labels:
           severity: critical
@@ -368,7 +406,7 @@ groups:
 
       # NAS disk temperatures — HDDs run hotter than SSDs; warn >55°C, critical >60°C
       - alert: NASDriveTemperatureHigh
-        expr: nas_smart_temperature_celsius > 55
+        expr: smart_temperature_celsius{host="mbuntu"} > 55
         for: 15m
         labels:
           severity: warning
@@ -377,7 +415,7 @@ groups:
           description: "NAS HDD {{ $labels.disk }} above 55°C for 15+ minutes. Check case airflow on mbuntu."
 
       - alert: NASDriveTemperatureCritical
-        expr: nas_smart_temperature_celsius > 60
+        expr: smart_temperature_celsius{host="mbuntu"} > 60
         for: 10m
         labels:
           severity: critical
@@ -403,3 +441,119 @@ groups:
         annotations:
           summary: "NAS root filesystem at {{ $value | printf \"%.0f\" }}%"
           description: "mbuntu / (boot disk) is {{ $value | printf \"%.0f\" }}% full. Clean old kernels/logs."
+
+      - alert: CriticalContainerDown
+        # UPDATED 2026-02-22: cAdvisor v0.49.1 required for cgroupv2 per-container metrics.
+        # Previously used absent(container_last_seen{name!=""}) but cAdvisor on cgroupv2
+        # only emits root cgroup until v0.49+. Now alerts when cAdvisor scrape target down.
+        # Per-container alerts (ContainerHighDiskUsage, ContainerRestartLoop) will work
+        # correctly once cAdvisor v0.49.1 is running and cgroupv2 per-container metrics flow.
+        expr: |
+          up{job="cadvisor"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cAdvisor is DOWN -- no Docker container metrics"
+          description: "cAdvisor scrape target is unreachable for 5+ minutes. Docker container monitoring is offline."
+
+  # ===========================================================================
+  # AdGuard Home DNS health and stats (via adguard-exporter on port 9618)
+  # ===========================================================================
+  - name: adguard_dns
+    rules:
+      - alert: AdGuardDown
+        expr: up{job="adguard-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard Home exporter is DOWN"
+          description: "adguard-exporter cannot reach AdGuard Home. DNS filtering may be offline."
+
+      - alert: AdGuardProtectionDisabled
+        expr: adguard_protection_enabled == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard protection is DISABLED"
+          description: "AdGuard Home DNS filtering has been turned off. All ads/trackers are unblocked."
+
+      - alert: AdGuardNotRunning
+        expr: adguard_running == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AdGuard Home is NOT running"
+          description: "AdGuard Home process has stopped. DNS resolution for the network may be degraded."
+
+      - alert: DNSQueryRateDrop
+        expr: rate(adguard_dns_queries_total[5m]) * 60 < 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS query rate near zero (less than 1/min for 5m)"
+          description: "AdGuard is receiving almost no DNS queries. Devices may have lost connectivity to 192.168.1.2."
+
+      - alert: DNSBlockRateSurge
+        expr: >
+          (rate(adguard_blocked_filtering_total[10m]) / rate(adguard_dns_queries_total[10m])) * 100 > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS block rate above 60% -- possible over-blocking"
+          description: "More than 60% of DNS queries are being blocked. A new filter list may be breaking services. Check AdGuard logs."
+
+      - alert: DNSHighLatency
+        expr: adguard_avg_processing_time_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS avg processing time above 100ms"
+          description: "AdGuard Home average DNS resolution time above 100ms for 5+ minutes. Upstream DNS may be slow."
+
+      - alert: DNSCriticalLatency
+        expr: adguard_avg_processing_time_seconds > 0.5
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL DNS latency above 500ms average"
+          description: "AdGuard DNS resolution averaging above 500ms. Network or upstream DNS severely degraded."
+
+  # ── Reboot / Shutdown Detection ─────────────────────────────────────────────
+  - name: reboot_detection
+    rules:
+
+      # Fires when node_boot_time_seconds changes — i.e. a machine rebooted.
+      # changes() over 10m: if boot time increases, a reboot occurred.
+      # Creates a visible firing event on Grafana dashboards for every reboot.
+      - alert: NodeRebooted
+        expr: changes(node_boot_time_seconds[10m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          service: system
+        annotations:
+          summary: "{{ $labels.instance }} rebooted"
+          description: >
+            Node {{ $labels.instance }} has rebooted. Boot time changed within
+            the last 10 minutes. Check reboot-notify email for pre/post metrics.
+
+      # Catches nodes that came back online recently (reboot or cold start).
+      - alert: NodeRecentBoot
+        expr: (time() - node_boot_time_seconds) < 600
+        for: 0m
+        labels:
+          severity: info
+          service: system
+        annotations:
+          summary: "{{ $labels.instance }} came back online (up < 10m)"
+          description: >
+            Node {{ $labels.instance }} has been up less than 10 minutes.
+            Verify all services resumed normally after reboot.
