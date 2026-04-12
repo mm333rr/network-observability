@@ -1,5 +1,13 @@
 # CHANGELOG — NetworkObservability Stack
 
+## [3.2.1] — 2026-04-12
+
+### Fixed — MacProHighCPUSustained alert too sensitive
+- `for: 5m` → `for: 15m` — plex-batch-optimizer (nice 10, -threads 8) running
+  alongside 2-3 Plex transcodes + Music Analyzers legitimately saturates CPU for
+  extended windows. 5m was firing on every normal heavy workload. 15m sustained
+  >90% now required before alerting — genuine saturation, not expected batch load.
+
 ## [3.2.0] — 2026-04-12
 
 ### Fixed — Telegraf metrics expiration

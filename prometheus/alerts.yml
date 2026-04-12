@@ -66,10 +66,14 @@ groups:
           description: "macOS memory compressor above 4 GB. System likely thrashing or frozen. Immediate intervention needed."
 
       # Mac Pro sustained high CPU — secondary processes (ffmpeg) crowding out Plex/WindowServer
-      # node_cpu_usage is 0-100% of total (all 16 cores). >90% for 5m = system saturated.
+      # node_cpu_usage is 0-100% of total (all 16 cores). >90% for 15m = system saturated.
+      # Extended 5m → 15m 2026-04-12: plex-batch-optimizer + 2 simultaneous Plex streams
+      # legitimately saturates CPU for extended periods. 5m was too sensitive.
+      # plex-batch-optimizer now runs at nice 10 (-threads 8) so 15m sustained >90%
+      # is a genuine signal that something unexpected is holding CPU.
       - alert: MacProHighCPUSustained
         expr: 100 - (avg by(host)(rate(node_cpu_seconds_total{mode="idle",host="macpro"}[5m])) * 100) > 90
-        for: 5m
+        for: 15m
         labels:
           severity: warning
         annotations:
