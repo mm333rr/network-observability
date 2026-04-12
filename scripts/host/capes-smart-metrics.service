@@ -1,0 +1,9 @@
+[Unit]
+Description=Capes SMART metrics — write drive health prometheus textfile
+Documentation=https://github.com/mm333rr/network-observability
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/capes/smart_metrics.sh
+StandardOutput=journal
+StandardError=journal

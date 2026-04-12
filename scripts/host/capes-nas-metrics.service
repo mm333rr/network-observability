@@ -1,0 +1,10 @@
+[Unit]
+Description=Capes NAS metrics — write ZFS/memory/disk prometheus textfile
+Documentation=https://github.com/mm333rr/network-observability
+After=zfs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/capes/nas_metrics.sh
+StandardOutput=journal
+StandardError=journal

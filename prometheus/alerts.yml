@@ -425,7 +425,7 @@ groups:
 
       # NAS system resources
       - alert: NASHighMemory
-        expr: nas_memory_usage_pct > 90
+        expr: mem_used_percent{host="mbuntu"} > 90  # fixed 2026-04-12: was nas_memory_usage_pct (never populated)
         for: 10m
         labels:
           severity: warning
@@ -434,7 +434,7 @@ groups:
           description: "mbuntu memory above 90% for 10+ minutes. ZFS ARC may be over-provisioned."
 
       - alert: NASRootDiskFull
-        expr: nas_disk_root_usage_pct > 80
+        expr: disk_used_percent{host="mbuntu",device="nvme0n1p2"} > 80  # fixed 2026-04-12: was nas_disk_root_usage_pct (never populated)
         for: 10m
         labels:
           severity: warning

@@ -1,5 +1,48 @@
 # CHANGELOG — NetworkObservability Stack
 
+## [3.2.0] — 2026-04-12
+
+### Fixed — Telegraf metrics expiration
+- `expiration_interval` raised 60s → 6m in `[[outputs.prometheus_client]]`.
+  SMART exec interval is 5m; metrics were expiring 60s after collection and
+  disappearing before Prometheus scraped them — silent data loss for 7 weeks.
+
+### Fixed — `nas_*` and `smart_*` alert rules had no backing metrics
+- All `nas_*` metrics (`nas_zpool_capacity_pct`, `nas_zpool_health`,
+  `nas_zpool_cksum_errors`, `nas_zpool_read_errors`, `nas_zpool_write_errors`,
+  `nas_up`, `nas_memory_usage_pct`, `nas_disk_root_usage_pct`) referenced in
+  alerts.yml but never produced by any Telegraf input. ZFS/SMART alert rules
+  were dead since stack deployment.
+- Root cause: `zpool` and `smartctl` require host glibc (Ubuntu 24 / GLIBC_2.38);
+  telegraf container image has older glibc — binary mount approach fails.
+
+### Added — Host-side textfile collector pattern
+- `scripts/host/nas_metrics.sh` — runs `zpool list`, `zpool status`, reads
+  `/proc/meminfo` and `df`. Writes Prometheus text to `/run/telegraf-nas/nas.prom`.
+- `scripts/host/smart_metrics.sh` — runs `smartctl` on all block devices.
+  Writes Prometheus text to `/run/telegraf-smart/smart.prom`.
+- `scripts/host/capes-nas-metrics.{service,timer}` — systemd oneshot + 5m timer.
+  Enabled and running on mbuntu.
+- `scripts/host/capes-smart-metrics.{service,timer}` — systemd oneshot + 5m timer.
+  Enabled and running on mbuntu.
+- `docker-compose.yml` — added `/run/telegraf-nas` and `/run/telegraf-smart`
+  read-only bind mounts into telegraf container.
+- `telegraf/telegraf.conf` — replaced `[[inputs.exec]]` stanzas for nas and smart
+  with `[[inputs.file]]` reading the textfile paths.
+
+### Fixed — alerts.yml: two NAS rules pointing at non-existent metrics
+- `NASHighMemory`: `nas_memory_usage_pct` → `mem_used_percent{host="mbuntu"}`
+  (Telegraf mem input already flowing).
+- `NASRootDiskFull`: `nas_disk_root_usage_pct` → `disk_used_percent{host="mbuntu",device="nvme0n1p2"}`
+  (Telegraf disk input already flowing).
+
+### Verified live
+- All 20 `nas_*` metrics in Prometheus ✅
+- All 17 `smart_*` metrics in Prometheus ✅ (6 disks: sda–sde + nvme0n1)
+- `ZFSPoolAlmostFull` pending → will fire (tank at 89%, threshold 80%) ✅
+- `NASDriveTemperatureHigh` pending → sdb/sdc at 58°C (threshold 55°C, scrub heat) ✅
+- All 46 alert rules healthy, no eval errors ✅
+
 ## [3.0.0] — 2026-02-21
 
 ### Portable Stack — Pi-Ready Refactor

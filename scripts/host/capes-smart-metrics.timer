@@ -1,0 +1,12 @@
+[Unit]
+Description=Capes SMART metrics — run every 5 minutes
+After=multi-user.target
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=5m
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
